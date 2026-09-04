@@ -53,6 +53,30 @@ class MediaStoreGateway(private val context: Context) {
         return null
     }
 
+    fun query(uri: Uri, expectedFile: File): MediaSnapshot? {
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DATA,
+            MediaStore.Images.Media.DATE_TAKEN,
+            MediaStore.Images.Media.DATE_ADDED
+        )
+        context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            if (!cursor.moveToFirst()) return null
+            val indexedPath = cursor.getString(1) ?: return null
+            val expectedPath = runCatching { expectedFile.canonicalPath }.getOrDefault(expectedFile.absolutePath)
+            val actualPath = runCatching { File(indexedPath).canonicalPath }.getOrDefault(indexedPath)
+            if (actualPath != expectedPath) return null
+            val addedSeconds = cursor.takeUnless { it.isNull(3) }?.getLong(3)?.takeIf { it > 0 }
+            return MediaSnapshot(
+                cursor.getLong(0),
+                cursor.takeUnless { it.isNull(2) }?.getLong(2)?.takeIf { it > 0 }?.let(Instant::ofEpochMilli),
+                addedSeconds?.let(Instant::ofEpochSecond),
+                addedSeconds
+            )
+        }
+        return null
+    }
+
     fun queryAll(): Map<String, MediaSnapshot> {
         val result = HashMap<String, MediaSnapshot>()
         val projection = arrayOf(

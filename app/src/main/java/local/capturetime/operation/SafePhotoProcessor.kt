@@ -106,7 +106,7 @@ class SafePhotoProcessor(
 
     private fun waitForMedia(file: File, scanUri: android.net.Uri?, expectedTaken: Long?, expectedAdded: Long?): Boolean {
         repeat(30) {
-            val current = runCatching { scanUri?.let(mediaStore::query) }.getOrNull()
+            val current = runCatching { scanUri?.let { mediaStore.query(it, file) } }.getOrNull()
                 ?: runCatching { mediaStore.query(file) }.getOrNull()
             val takenOk = expectedTaken == null || current?.dateTaken?.toEpochMilli() == expectedTaken
             val addedOk = expectedAdded == null || current?.rawDateAddedSeconds == expectedAdded
@@ -117,7 +117,7 @@ class SafePhotoProcessor(
     }
 
     private fun mediaDiagnostic(file: File, scanUri: android.net.Uri?, expectedTaken: Long?, expectedAdded: Long?): String {
-        val actual = runCatching { scanUri?.let(mediaStore::query) }.getOrNull()
+        val actual = runCatching { scanUri?.let { mediaStore.query(it, file) } }.getOrNull()
             ?: runCatching { mediaStore.query(file) }.getOrNull()
         return "失败；期望 DATE_TAKEN=${expectedTaken ?: "null"}, 实际=${actual?.dateTaken?.toEpochMilli() ?: "null"}; " +
             "期望 DATE_ADDED=${expectedAdded ?: "null"}, 实际=${actual?.rawDateAddedSeconds ?: "null"}"

@@ -28,6 +28,7 @@ class SettingsActivity : Activity() {
         seconds.setText(prefs.getInt("seconds", 0).toString())
         findViewById<Button>(local.capturetime.R.id.saveSettings).setOnClickListener { save() }
         findViewById<Button>(local.capturetime.R.id.viewLogs).setOnClickListener { showLogs() }
+        findViewById<Button>(local.capturetime.R.id.clearBackups).setOnClickListener { confirmClearBackups() }
     }
 
     private fun save() {
@@ -48,6 +49,36 @@ class SettingsActivity : Activity() {
         }
         android.app.AlertDialog.Builder(this).setTitle("会话日志").setMessage(text).setPositiveButton("关闭", null).show()
     }
+
+    private fun confirmClearBackups() {
+        val sessions = backupSessions()
+        if (sessions.isEmpty()) {
+            Toast.makeText(this, "没有找到可清除的备份", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val totalBytes = sessions.sumOf { it.walkTopDown().filter(File::isFile).sumOf(File::length) }
+        val sizeText = if (totalBytes >= 1024 * 1024) "%.1f MB".format(totalBytes / 1024.0 / 1024.0) else "%.1f KB".format(totalBytes / 1024.0)
+        android.app.AlertDialog.Builder(this)
+            .setTitle("清除备份？")
+            .setMessage("将永久删除 ${sessions.size} 个会话目录，约 $sizeText。\n\n其中包含照片原始备份和 TSV/JSON 日志。清除后无法使用这些备份恢复照片。\n\n只会删除名称以 capture-time-app- 开头的目录，不会删除 .temp 下其他内容。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确认清除") { _, _ -> clearBackups(sessions) }
+            .show()
+    }
+
+    private fun clearBackups(sessions: List<File>) {
+        var removed = 0
+        var failed = 0
+        sessions.forEach { if (it.deleteRecursively()) removed++ else failed++ }
+        val message = if (failed == 0) "已清除 $removed 个备份会话目录" else "已清除 $removed 个目录，$failed 个目录清除失败"
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    private fun backupSessions(): List<File> = File(android.os.Environment.getExternalStorageDirectory(), ".temp")
+        .listFiles()
+        ?.filter { it.isDirectory && it.name.startsWith("capture-time-app-") && it.name.length > "capture-time-app-".length }
+        ?.sortedByDescending { it.name }
+        .orEmpty()
 
     private fun EditText.value(range: IntRange): Int? {
         val value = text.toString().toIntOrNull()
