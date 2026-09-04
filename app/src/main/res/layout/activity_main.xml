@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#F5F7F4" android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="#123C35" android:orientation="vertical" android:padding="20dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:text="拍摄时间修正" android:textColor="#FFFFFF" android:textSize="25sp" android:textStyle="bold" />
+            <Button android:id="@+id/settingsButton" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:backgroundTint="#2C665A" android:text="设置" android:textColor="#FFFFFF" />
+        </LinearLayout>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp"
+            android:text="本机照片 · 安全预览与可逆修正" android:textColor="#B7D8C9" android:textSize="14sp" />
+    </LinearLayout>
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+            <TextView android:id="@+id/permissionStatus" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:background="#E2EEE9" android:padding="14dp" android:textColor="#16473E" android:textSize="14sp" />
+            <Button android:id="@+id/permissionButton" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:text="管理存储权限" />
+
+            <TextView style="@style/SectionTitle" android:text="扫描预览" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <Button android:id="@+id/scanButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="重新扫描" />
+                <ProgressBar android:id="@+id/scanProgress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical" android:layout_marginStart="12dp" android:visibility="gone" />
+            </LinearLayout>
+            <TextView android:id="@+id/scanSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="10dp" android:text="尚未扫描" android:textColor="#52635D" />
+            <androidx.recyclerview.widget.RecyclerView android:id="@+id/photoList" android:layout_width="match_parent" android:layout_height="420dp" android:clipToPadding="false" android:paddingBottom="8dp" />
+
+            <TextView style="@style/SectionTitle" android:text="单张试运行" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="先选中一张候选。写入前会再次检查权限、时间和路径。" android:textColor="#52635D" />
+            <Button android:id="@+id/trialButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:enabled="false" android:text="确认单张试运行" />
+
+            <TextView style="@style/SectionTitle" android:text="批量执行" />
+            <TextView android:id="@+id/batchStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="需先完成一张 JPEG 试运行" android:textColor="#A14B16" />
+            <Button android:id="@+id/batchButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:enabled="false" android:text="查看风险并确认批量执行" />
+
+            <TextView android:id="@+id/resultText" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="14dp" android:textColor="#16473E" android:textIsSelectable="true" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

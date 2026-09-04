@@ -1,0 +1,151 @@
+# 拍摄时间修正
+
+仅供本机侧载使用的 Android 工具。应用扫描共享存储中的 JPEG、HEIC/HEIF 和 PNG，取当前拍摄时间、MediaStore 添加时间和受支持的文件名时间中最早的一项，在用户明确确认后将更早的目标时间写入照片 EXIF。
+
+应用不联网、不上传数据、不改文件名、不删除照片、不更新 MediaStore `DATE_TAKEN` 或 `DATE_ADDED`，也不访问小米图库的私有数据库或接口。Manifest 未声明 `INTERNET` 权限。
+
+## 环境
+
+- Android 11（API 30）或更高版本
+- Android Studio Ladybug 或更新版本
+- Android SDK Platform 35
+- JDK 17（Android Studio 自带的 JBR 即可）
+- 小米 HyperOS 手机，系统时区设为 `Asia/Shanghai`（UTC+08:00）
+
+## Android Studio 构建
+
+1. 在 Android Studio 中选择 **Open**，打开本 README 所在的 `capture-time-app` 目录。
+2. 等待 Gradle Sync 完成。首次构建需要 Android Studio 下载 Gradle、Android Gradle Plugin、Kotlin 插件和 `androidx.exifinterface`。
+3. 选择 **Build > Build Bundle(s) / APK(s) > Build APK(s)**。
+4. Debug APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
+
+也可在已配置 JDK 17 和 Android SDK 的终端执行：
+
+```powershell
+.\gradlew.bat testDebugUnitTest
+.\gradlew.bat assembleDebug
+```
+
+依赖仅来自 Google Maven/Maven Central：Android Gradle Plugin、Kotlin Gradle Plugin、`androidx.exifinterface` 和仅用于本地测试的 JUnit。应用运行时不使用任何云服务或网络 SDK。
+
+## GitHub 自动化
+
+- 对 `main` 的推送和所有拉取请求会运行单元测试、构建 Debug APK，并将 APK 作为 Actions 构件保留。
+- 推送形如 `v1.0.0` 的版本标签会构建未签名 Release APK、生成 SHA-256 校验文件，并创建带 GitHub 自动生成发布说明的 Release。
+
+## 安装
+
+1. 将 `app-debug.apk` 传到手机本地。
+2. 在系统文件管理器中打开 APK。
+3. 按 HyperOS 提示允许该来源安装未知应用。
+4. 完成安装后打开“拍摄时间修正”。
+
+无需 root，不需要 ADB shell。发布签名不是本地侧载的必要条件；如需长期保留同一安装，可在 Android Studio 中使用自己的签名生成 APK。
+
+## 授予权限
+
+1. 在应用首页点击“授予所有文件访问权限”。
+2. 在系统设置中打开“允许访问所有文件”。
+3. Android 13 及以上如果同时出现照片读取权限提示，请允许访问照片。
+4. 返回应用，确认页面显示“权限状态：已授予”。
+
+拒绝或撤销 `MANAGE_EXTERNAL_STORAGE` 后，扫描和所有写入入口均禁用。每张照片真正写入前还会再次检查权限。
+
+## 撤销权限
+
+可使用任一方式：
+
+- 系统设置 > 应用 > 特殊应用权限 > 所有文件访问权限 > 拍摄时间修正 > 关闭。
+- 系统设置 > 应用管理 > 拍摄时间修正 > 权限，撤销照片读取权限。
+- 卸载应用。
+
+撤销权限不会删除已有会话备份和日志。
+
+## 使用流程
+
+1. 点击“扫描照片（只读）”。应用不会自动写入。
+2. 查看每项的路径、当前拍摄时间、添加时间、文件名时间、目标时间、格式和安全状态。
+3. 选择一张 JPEG 候选，点击“确认单张试运行”，阅读确认对话框后再次确认。
+4. 只有 JPEG 完整通过备份、写入、EXIF 重读、媒体扫描和 MediaStore 精确验证后，批量按钮才会启用。
+5. 点击批量按钮查看预计处理数、跳过数和风险，再次确认后才逐张执行。
+6. HEIC/HEIF 和 PNG 默认不进入批量。对应格式必须先在当前预览中完成单张试运行；解锁仅在内存中有效，重新扫描或重启应用后失效。
+
+首次在系统设置中授予“所有文件访问权限”并返回应用后，应用会自动进行一次只读扫描。扫描快照保存在应用私有本机空间 `files/last-scan.json`，下次打开应用会先显示上次快照；需要获取最新文件状态时点击“重新扫描”。列表只显示候选项，并使用 `RecyclerView` 虚拟化滚动，不会为全部照片创建界面控件。
+
+主页右上角“设置”可以配置时间误差，分别输入天、时、分、秒。目标时间与当前拍摄时间的差值不超过该误差时，不进入候选；保存设置会返回主页并重新扫描。会话日志入口也在设置页。
+
+应用只识别文件名中的：
+
+```text
+YYYY-MM-DD-HH-MM-SS
+YYYYMMDD_HHMMSS
+YYYYMMDD-HHMMSS
+```
+
+无时区的文件名和 EXIF 均按 `Asia/Shanghai` 严格解析。非法日期或一个文件名中出现多个不同有效时间时会跳过。
+
+## 扫描范围与排除项
+
+扫描：
+
+```text
+/sdcard/DCIM
+/sdcard/Pictures
+/sdcard/Download/MiShare
+```
+
+`DCIM` 大小写不敏感并去重。应用不跟随符号链接。路径任一段为 `.globalTrash`、`.thumbnails` 或以 `.trashed-` 开头时均排除；`/sdcard/DCIM/.globalTrash` 有额外硬保护。应用不会扫描视频，也不会读取、清理或删除 `/sdcard/.temp` 的既有内容。
+
+## 安全链路
+
+每次单张或批量执行都会创建全新的目录：
+
+```text
+/sdcard/.temp/capture-time-app-YYYYMMDD-HHMMSS/
+```
+
+每张照片按相对原路径备份。应用要求备份和原文件长度及 SHA-256 完全一致，才使用 `ExifInterface` 写入：
+
+```text
+DateTimeOriginal
+DateTimeDigitized
+DateTime
+```
+
+写入值格式为 `yyyy:MM:dd HH:mm:ss`。应用不解码、重编码或压缩像素。写入后立即重读三个标签，再调用公开的 `MediaScannerConnection.scanFile()`。MediaStore 最多等待 15 秒，要求 `DATE_TAKEN` 精确等于目标整秒，并要求操作前后的 `DATE_ADDED` 秒值完全一致。
+
+缺少可查询 `DATE_ADDED` 的文件会跳过，因为应用无法安全证明添加时间未变化。应用从不直接更新 MediaStore 时间列。
+
+任何写入后错误都会立即从本会话备份覆盖恢复原文件，校验恢复文件与备份 SHA-256 一致，重新扫描，并核验原 EXIF、原 `DATE_TAKEN` 和原 `DATE_ADDED`。没有无限重试。
+
+## 日志
+
+每个会话目录包含：
+
+- `planned.tsv`：该次执行采用的完整扫描快照、候选与跳过原因。
+- `changed.tsv`：成功修改及 EXIF、MediaStore 核验结果。
+- `skipped.tsv`：未修改项目及原因。
+- `restored.tsv`：写入后失败并进入恢复流程的项目、恢复核验结果。
+- `summary.json`：扫描、候选、成功、跳过、恢复、失败计数和会话路径。
+
+日志为 UTF-8。首页“查看最近会话日志”可查看摘要和目录；也可用系统文件管理器打开该目录。
+
+## 手工恢复
+
+正常失败会自动恢复。若手机断电、系统强杀进程或存储故障导致自动恢复没有完成：
+
+1. 立即停止使用应用，不要再次对同一照片执行批量操作。
+2. 打开最近的会话目录，根据 `restored.tsv`、`changed.tsv` 和 `summary.json` 找到原路径与 `backup_path`。
+3. 备份目录保持了原共享存储相对路径，例如会话中的 `DCIM/Camera/IMG_0001.jpg` 对应 `/sdcard/DCIM/Camera/IMG_0001.jpg`。
+4. 先将当前原路径文件另存到其他位置，再将会话备份复制回原路径。不要改名。
+5. 在系统设置中重启媒体存储相关服务或重启手机，让系统重新扫描；不要手工编辑 MediaStore 数据库。
+6. 比较恢复文件和会话备份的 SHA-256；只有完全一致才视为文件内容恢复。
+
+应用从不自动删除会话目录。确认无需恢复后，用户可自行归档或删除特定的 `capture-time-app-*` 目录；不要让清理工具误删尚需恢复的备份。
+
+## 平台限制
+
+- 小米图库是否立即刷新由 HyperOS 媒体扫描器决定；应用以公开 MediaStore 的精确核验为成功条件。
+- HEIC/HEIF、PNG 的可写能力取决于设备、系统版本和具体文件结构，因此必须逐格式完成当前预览的真实单张测试。
+- 系统媒体提供程序若自行改变 `DATE_ADDED`，应用会判定失败并恢复照片内容，但不会违反约束去写回该数据库列。
+- 应用只能防护自身进程内可检测的错误。断电和底层存储损坏无法做到绝对事务原子性，因此原始备份会永久保留，直到用户自行处理。
