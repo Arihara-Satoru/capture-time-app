@@ -7,8 +7,9 @@ import local.capturetime.model.CaptureSource
 import local.capturetime.model.ImageFormat
 import local.capturetime.model.PhotoRecord
 import local.capturetime.security.PathPolicy
+import local.capturetime.settings.TimeField
+import local.capturetime.settings.TimeRuleConfig
 import local.capturetime.time.CaptureTimeParser
-import local.capturetime.time.PlanningRules
 import java.io.File
 import java.io.FileInputStream
 import java.time.Instant
@@ -17,7 +18,7 @@ import java.util.Locale
 class PhotoScanner(
     private val mediaStore: MediaStoreGateway,
     private val exif: ExifGateway,
-    private val toleranceSeconds: Long = 0
+    private val rule: TimeRuleConfig = TimeRuleConfig()
 ) {
     fun scan(): List<PhotoRecord> {
         val storage = Environment.getExternalStorageDirectory()
@@ -37,7 +38,8 @@ class PhotoScanner(
         if (!PathPolicy.isSafeFile(file, roots)) return skipped(file, format, "路径不安全或位于排除目录")
         if (format == ImageFormat.OTHER) return skipped(file, format, "扩展名与文件签名不匹配或格式不支持")
 
-        val exifTime = exif.readOriginal(file)
+        val rawExif = runCatching { exif.readRaw(file) }.getOrNull()
+        val exifTime = CaptureTimeParser.parseExif(rawExif?.original)
         val media = indexedMedia
         if (media?.rawDateAddedSeconds == null) {
             return skipped(file, format, "缺少可核验的 MediaStore DATE_ADDED，无法证明添加时间不变", exifTime, media)
@@ -49,18 +51,20 @@ class PhotoScanner(
             else -> null
         }
         val stem = file.name.substringBeforeLast('.', file.name)
-        if (CaptureTimeParser.hasAmbiguousFilenameTime(stem)) {
+        if (TimeField.FILENAME in rule.sourceFields && CaptureTimeParser.hasAmbiguousFilenameTime(stem)) {
             return skipped(file, format, "文件名包含多个不同的有效时间", exifTime, media)
         }
         val filenameTime = CaptureTimeParser.parseFilename(stem)
-        if (current == null) return skipped(file, format, "缺少有效的当前拍摄时间", exifTime, media, filenameTime)
-        val target = PlanningRules.target(current, media?.dateAdded, filenameTime)
-        val candidate = PlanningRules.isCandidate(current, target, toleranceSeconds)
+        val values = rule.values(rawExif, media, filenameTime, Instant.ofEpochMilli(file.lastModified()))
+        val target = rule.selectTarget(values)
+            ?: return skipped(file, format, "所选依据字段均缺少有效时间", exifTime, media, filenameTime)
+        val changedFields = rule.destinationFields.filter { field -> rule.needsChange(values[field], target) }
+        val candidate = changedFields.isNotEmpty()
         val reason = when {
             !file.canWrite() -> "文件不可写"
-            !candidate -> "目标时间不早于当前拍摄时间"
-            format == ImageFormat.JPEG -> "可安全试运行"
-            else -> "需先完成本次预览的单张格式能力测试"
+            candidate && format == ImageFormat.JPEG -> "将修改：${changedFields.joinToString("、") { it.label }}"
+            candidate -> "需先完成本次预览的单张格式能力测试；将修改：${changedFields.joinToString("、") { it.label }}"
+            else -> "所选修改字段与目标时间一致或在忽略误差内"
         }
         return PhotoRecord(
             file, format, exifTime, media, filenameTime, current, source, target,

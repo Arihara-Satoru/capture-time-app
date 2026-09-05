@@ -25,6 +25,7 @@ import local.capturetime.operation.SafePhotoProcessor
 import local.capturetime.operation.SessionLogger
 import local.capturetime.scan.PhotoScanner
 import local.capturetime.scan.ScanSnapshotStore
+import local.capturetime.settings.TimeRuleConfig
 import local.capturetime.time.CaptureTimeParser
 import java.io.File
 import java.util.concurrent.Executors
@@ -35,6 +36,7 @@ class MainActivity : Activity() {
     private lateinit var exif: ExifGateway
     private lateinit var scanner: PhotoScanner
     private lateinit var processor: SafePhotoProcessor
+    private lateinit var timeRule: TimeRuleConfig
     private lateinit var snapshotStore: ScanSnapshotStore
     private lateinit var adapter: PhotoAdapter
     private var records: List<PhotoRecord> = emptyList()
@@ -60,9 +62,7 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         mediaStore = MediaStoreGateway(this)
         exif = ExifGateway()
-        val tolerance = toleranceSeconds()
-        scanner = PhotoScanner(mediaStore, exif, tolerance)
-        processor = SafePhotoProcessor(this, exif, mediaStore, tolerance)
+        reloadTimeRule()
         snapshotStore = ScanSnapshotStore(this)
         adapter = PhotoAdapter { record -> selected = record; updateActions() }
         findViewById<RecyclerView>(R.id.photoList).apply {
@@ -90,6 +90,14 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         updatePermissionState()
+        if (settingsOpened) {
+            settingsOpened = false
+            val savedRule = TimeRuleConfig.load(this)
+            if (savedRule != timeRule) {
+                reloadTimeRule(savedRule)
+                if (Environment.isExternalStorageManager()) scanPreview()
+            }
+        }
         if (autoScanRequested && Environment.isExternalStorageManager()) {
             autoScanRequested = false
             scanPreview()
@@ -149,7 +157,7 @@ class MainActivity : Activity() {
     private fun confirmTrial() {
         val record = selected ?: return
         AlertDialog.Builder(this).setTitle("确认单张试运行")
-            .setMessage("将创建全新会话并备份：\n${record.file.absolutePath}\n\n目标时间：${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}\n失败将立即恢复。是否继续？")
+            .setMessage("将创建全新会话并备份：\n${record.file.absolutePath}\n\n规则目标时间：${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}\n${record.reason}\n失败将立即恢复。是否继续？")
             .setNegativeButton("取消", null).setPositiveButton("确认写入") { _, _ -> runSession(listOf(record), true) }.show()
     }
 
@@ -213,9 +221,9 @@ class MainActivity : Activity() {
     private fun ensurePermission(): Boolean { if (Environment.isExternalStorageManager()) return true; Toast.makeText(this, "未授予所有文件访问权限，已拒绝执行", Toast.LENGTH_LONG).show(); updatePermissionState(); return false }
     private fun showError(message: String) { resultText.text = message; Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
 
-    private fun toleranceSeconds(): Long {
-        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        return prefs.getInt("days", 0) * 86_400L + prefs.getInt("hours", 0) * 3_600L +
-            prefs.getInt("minutes", 0) * 60L + prefs.getInt("seconds", 0)
+    private fun reloadTimeRule(rule: TimeRuleConfig = TimeRuleConfig.load(this)) {
+        timeRule = rule
+        scanner = PhotoScanner(mediaStore, exif, timeRule)
+        processor = SafePhotoProcessor(this, exif, mediaStore, timeRule)
     }
 }

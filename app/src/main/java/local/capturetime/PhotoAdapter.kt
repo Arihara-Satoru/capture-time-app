@@ -50,7 +50,7 @@ class PhotoAdapter(private val onSelected: (PhotoRecord) -> Unit) : RecyclerView
                 append("当前拍摄：").append(CaptureTimeParser.formatDisplay(record.currentCaptureTime)).append('\n')
                 append("添加时间：").append(CaptureTimeParser.formatDisplay(record.media?.dateAdded)).append('\n')
                 append("文件名时间：").append(CaptureTimeParser.formatDisplay(record.filenameTime)).append('\n')
-                append("目标拍摄：").append(CaptureTimeParser.formatDisplay(record.targetCaptureTime)).append('\n')
+                append("规则目标：").append(CaptureTimeParser.formatDisplay(record.targetCaptureTime)).append('\n')
                 append("路径：").append(record.file.parent ?: record.file.absolutePath)
             }
             itemView.setOnClickListener {

@@ -3,7 +3,10 @@ package local.capturetime.settings
 import android.app.Activity
 import android.os.Bundle
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
@@ -14,6 +17,9 @@ class SettingsActivity : Activity() {
     private lateinit var hours: EditText
     private lateinit var minutes: EditText
     private lateinit var seconds: EditText
+    private lateinit var selection: Spinner
+    private val sourceBoxes = linkedMapOf<TimeField, CheckBox>()
+    private val destinationBoxes = linkedMapOf<TimeField, CheckBox>()
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -22,6 +28,28 @@ class SettingsActivity : Activity() {
         hours = findViewById(local.capturetime.R.id.settingHours)
         minutes = findViewById(local.capturetime.R.id.settingMinutes)
         seconds = findViewById(local.capturetime.R.id.settingSeconds)
+        selection = findViewById(local.capturetime.R.id.timeSelection)
+        selection.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, TimeSelection.entries.map { it.label })
+        sourceBoxes.putAll(mapOf(
+            TimeField.CURRENT_CAPTURE to findViewById(local.capturetime.R.id.sourceCurrentCapture),
+            TimeField.EXIF_ORIGINAL to findViewById(local.capturetime.R.id.sourceExifOriginal),
+            TimeField.EXIF_DIGITIZED to findViewById(local.capturetime.R.id.sourceExifDigitized),
+            TimeField.EXIF_MODIFIED to findViewById(local.capturetime.R.id.sourceExifModified),
+            TimeField.MEDIA_DATE_TAKEN to findViewById(local.capturetime.R.id.sourceMediaTaken),
+            TimeField.MEDIA_DATE_ADDED to findViewById(local.capturetime.R.id.sourceMediaAdded),
+            TimeField.FILENAME to findViewById(local.capturetime.R.id.sourceFilename),
+            TimeField.FILE_MODIFIED to findViewById(local.capturetime.R.id.sourceFileModified)
+        ))
+        destinationBoxes.putAll(mapOf(
+            TimeField.EXIF_ORIGINAL to findViewById(local.capturetime.R.id.destinationExifOriginal),
+            TimeField.EXIF_DIGITIZED to findViewById(local.capturetime.R.id.destinationExifDigitized),
+            TimeField.EXIF_MODIFIED to findViewById(local.capturetime.R.id.destinationExifModified),
+            TimeField.FILE_MODIFIED to findViewById(local.capturetime.R.id.destinationFileModified)
+        ))
+        val rule = TimeRuleConfig.load(this)
+        selection.setSelection(TimeSelection.entries.indexOf(rule.selection))
+        sourceBoxes.forEach { (field, box) -> box.isChecked = field in rule.sourceFields }
+        destinationBoxes.forEach { (field, box) -> box.isChecked = field in rule.destinationFields }
         days.setText(prefs.getInt("days", 0).toString())
         hours.setText(prefs.getInt("hours", 0).toString())
         minutes.setText(prefs.getInt("minutes", 0).toString())
@@ -36,8 +64,17 @@ class SettingsActivity : Activity() {
         val h = hours.value(0..23) ?: return
         val m = minutes.value(0..59) ?: return
         val s = seconds.value(0..59) ?: return
-        prefs.edit().putInt("days", d).putInt("hours", h).putInt("minutes", m).putInt("seconds", s).apply()
-        Toast.makeText(this, "误差已保存，返回主页后将按新规则重新扫描", Toast.LENGTH_LONG).show()
+        val sources = sourceBoxes.filterValues { it.isChecked }.keys
+        val destinations = destinationBoxes.filterValues { it.isChecked }.keys
+        if (sources.isEmpty()) return errorText("请至少选择一个依据字段")
+        if (destinations.isEmpty()) return errorText("请至少选择一个修改字段")
+        prefs.edit()
+            .putInt("days", d).putInt("hours", h).putInt("minutes", m).putInt("seconds", s)
+            .putString("time_selection", TimeSelection.entries[selection.selectedItemPosition].name)
+            .putString("source_fields", sources.joinToString(",") { it.name })
+            .putString("destination_fields", destinations.joinToString(",") { it.name })
+            .apply()
+        Toast.makeText(this, "时间规则已保存，返回主页后将按新规则重新扫描", Toast.LENGTH_LONG).show()
         finish()
     }
 

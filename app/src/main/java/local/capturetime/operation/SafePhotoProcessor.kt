@@ -8,8 +8,9 @@ import local.capturetime.media.MediaStoreGateway
 import local.capturetime.model.PhotoRecord
 import local.capturetime.model.ProcessResult
 import local.capturetime.security.PathPolicy
+import local.capturetime.settings.TimeField
+import local.capturetime.settings.TimeRuleConfig
 import local.capturetime.time.CaptureTimeParser
-import local.capturetime.time.PlanningRules
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -21,7 +22,7 @@ class SafePhotoProcessor(
     private val context: Context,
     private val exif: ExifGateway,
     private val mediaStore: MediaStoreGateway,
-    private val toleranceSeconds: Long = 0
+    private val rule: TimeRuleConfig = TimeRuleConfig()
 ) {
     fun process(record: PhotoRecord, session: SessionLogger): ProcessResult {
         val target = record.targetCaptureTime
@@ -41,13 +42,14 @@ class SafePhotoProcessor(
             ?: return failure(record, "写入前 MediaStore 记录已消失")
         if (originalMedia.rawDateAddedSeconds == null) return failure(record, "写入前 DATE_ADDED 已不可核验")
         val originalModifiedMillis = record.file.lastModified()
-        val currentExifTime = runCatching { exif.readOriginal(record.file) }.getOrNull()
-        val currentCapture = currentExifTime ?: originalMedia?.dateTaken
-            ?: return failure(record, "写入前已缺少当前拍摄时间")
         val stem = record.file.name.substringBeforeLast('.', record.file.name)
-        if (CaptureTimeParser.hasAmbiguousFilenameTime(stem)) return failure(record, "写入前文件名时间存在歧义")
-        val recalculatedTarget = PlanningRules.target(currentCapture, originalMedia?.dateAdded, CaptureTimeParser.parseFilename(stem))
-        if (recalculatedTarget != target || !PlanningRules.isCandidate(currentCapture, target, toleranceSeconds)) {
+        if (TimeField.FILENAME in rule.sourceFields && CaptureTimeParser.hasAmbiguousFilenameTime(stem)) {
+            return failure(record, "写入前文件名时间存在歧义")
+        }
+        val values = rule.values(originalExif, originalMedia, CaptureTimeParser.parseFilename(stem), java.time.Instant.ofEpochMilli(originalModifiedMillis))
+        val recalculatedTarget = rule.selectTarget(values)
+        val changedFields = rule.destinationFields.filterTo(mutableSetOf()) { rule.needsChange(values[it], target) }
+        if (recalculatedTarget != target || changedFields.isEmpty()) {
             return failure(record, "预览后时间状态已变化，已安全跳过")
         }
         var modified = false
@@ -62,16 +64,18 @@ class SafePhotoProcessor(
             beforeHash = sha256(record.file)
             require(record.file.length() == backup.length() && beforeHash == sha256(backup)) { "备份完整性校验失败" }
 
-            exif.writeAll(record.file, target)
+            val exifFields = changedFields.filterTo(mutableSetOf()) { it != TimeField.FILE_MODIFIED }
+            if (exifFields.isNotEmpty()) exif.write(record.file, target, exifFields)
             modified = true
-            exifVerification = if (exif.verifyAll(record.file, target)) "通过" else "失败"
-            require(exifVerification == "通过") { "EXIF 三字段核验失败" }
+            exifVerification = if (exifFields.isEmpty() || exif.verify(record.file, target, exifFields)) "通过" else "失败"
+            require(exifVerification == "通过") { "所选 EXIF 字段核验失败" }
 
-            // HyperOS may derive DATE_TAKEN from filesystem mtime after EXIF save.
-            require(record.file.setLastModified(target.toEpochMilli())) { "无法设置扫描用文件修改时间" }
+            val expectedModified = if (TimeField.FILE_MODIFIED in changedFields) target.toEpochMilli() else originalModifiedMillis
+            require(record.file.setLastModified(expectedModified)) { "无法设置文件修改时间" }
+            require(kotlin.math.abs(record.file.lastModified() - expectedModified) < 1000) { "文件修改时间核验失败" }
             val scannedUri = scan(record.file)
             require(scannedUri != null) { "媒体扫描超时或失败" }
-            val expectedMillis = target.epochSecond * 1000
+            val expectedMillis = if (TimeField.EXIF_ORIGINAL in changedFields) target.epochSecond * 1000 else originalMedia.dateTaken?.toEpochMilli()
             val verified = waitForMedia(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
             mediaVerification = if (verified) "通过（扫描回调 URI）" else mediaDiagnostic(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
             require(verified) { "MediaStore DATE_TAKEN 或 DATE_ADDED 核验失败" }
