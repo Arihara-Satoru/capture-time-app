@@ -77,6 +77,14 @@ class MediaStoreGateway(private val context: Context) {
         return null
     }
 
+    fun resolveFile(uri: Uri): File? = runCatching {
+        val projection = arrayOf(MediaStore.Images.Media.DATA)
+        context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            cursor.getString(0)?.let(::File)?.takeIf { it.isFile }
+        }
+    }.getOrNull()
+
     fun queryAll(): Map<String, MediaSnapshot> {
         val result = HashMap<String, MediaSnapshot>()
         val projection = arrayOf(

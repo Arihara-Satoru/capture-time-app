@@ -1,7 +1,13 @@
 package local.capturetime.settings
 
+import android.Manifest
 import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -9,6 +15,8 @@ import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 
 class SettingsActivity : Activity() {
@@ -23,6 +31,7 @@ class SettingsActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        DynamicColors.applyToActivityIfAvailable(this)
         setContentView(local.capturetime.R.layout.activity_settings)
         days = findViewById(local.capturetime.R.id.settingDays)
         hours = findViewById(local.capturetime.R.id.settingHours)
@@ -55,8 +64,54 @@ class SettingsActivity : Activity() {
         minutes.setText(prefs.getInt("minutes", 0).toString())
         seconds.setText(prefs.getInt("seconds", 0).toString())
         findViewById<Button>(local.capturetime.R.id.saveSettings).setOnClickListener { save() }
+        findViewById<Button>(local.capturetime.R.id.permissionButton).setOnClickListener { requestStorageAccess() }
+        findViewById<com.google.android.material.appbar.MaterialToolbar>(local.capturetime.R.id.settingsToolbar)
+            .setNavigationOnClickListener { finish() }
         findViewById<Button>(local.capturetime.R.id.viewLogs).setOnClickListener { showLogs() }
         findViewById<Button>(local.capturetime.R.id.clearBackups).setOnClickListener { confirmClearBackups() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updatePermissionState()
+    }
+
+    private fun updatePermissionState() {
+        val granted = hasStorageAccess()
+        findViewById<TextView>(local.capturetime.R.id.permissionStatus).apply {
+            text = if (granted) "已授权，可以全局扫描和原地修正照片" else "权限不完整，全局扫描与照片修改不可用"
+            setTextColor(getColor(if (granted) local.capturetime.R.color.permission_granted else local.capturetime.R.color.permission_missing))
+        }
+        findViewById<Button>(local.capturetime.R.id.permissionButton).text = if (granted) "管理权限" else "授权所有文件访问"
+    }
+
+    private fun requestStorageAccess() {
+        val mediaPermission = if (android.os.Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
+        if (checkSelfPermission(mediaPermission) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(mediaPermission), REQUEST_MEDIA_PERMISSION)
+            return
+        }
+        openAllFilesSettings()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_MEDIA_PERMISSION && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            openAllFilesSettings()
+        } else if (requestCode == REQUEST_MEDIA_PERMISSION) {
+            Toast.makeText(this, "照片读取权限未授予", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun openAllFilesSettings() {
+        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName"))
+        runCatching { startActivity(intent) }
+            .onFailure { startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+    }
+
+    private fun hasStorageAccess(): Boolean {
+        val mediaPermission = if (android.os.Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
+        return Environment.isExternalStorageManager() && checkSelfPermission(mediaPermission) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun save() {
@@ -74,7 +129,7 @@ class SettingsActivity : Activity() {
             .putString("source_fields", sources.joinToString(",") { it.name })
             .putString("destination_fields", destinations.joinToString(",") { it.name })
             .apply()
-        Toast.makeText(this, "时间规则已保存，返回主页后将按新规则重新扫描", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "时间规则已保存，将刷新当前照片预览", Toast.LENGTH_LONG).show()
         finish()
     }
 
@@ -84,7 +139,7 @@ class SettingsActivity : Activity() {
         val text = if (sessions.isEmpty()) "暂无会话日志" else sessions.joinToString("\n\n") { session ->
             "${session.name}\n${File(session, "summary.json").takeIf { it.isFile }?.readText().orEmpty()}"
         }
-        android.app.AlertDialog.Builder(this).setTitle("会话日志").setMessage(text).setPositiveButton("关闭", null).show()
+        MaterialAlertDialogBuilder(this).setTitle("会话日志").setMessage(text).setPositiveButton("关闭", null).show()
     }
 
     private fun confirmClearBackups() {
@@ -95,7 +150,7 @@ class SettingsActivity : Activity() {
         }
         val totalBytes = sessions.sumOf { it.walkTopDown().filter(File::isFile).sumOf(File::length) }
         val sizeText = if (totalBytes >= 1024 * 1024) "%.1f MB".format(totalBytes / 1024.0 / 1024.0) else "%.1f KB".format(totalBytes / 1024.0)
-        android.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle("清除备份？")
             .setMessage("将永久删除 ${sessions.size} 个会话目录，约 $sizeText。\n\n其中包含照片原始备份和 TSV/JSON 日志。清除后无法使用这些备份恢复照片。\n\n只会删除名称以 capture-time-app- 开头的目录，不会删除 .temp 下其他内容。")
             .setNegativeButton("取消", null)
@@ -127,4 +182,8 @@ class SettingsActivity : Activity() {
     }
 
     private fun errorText(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+
+    companion object {
+        private const val REQUEST_MEDIA_PERMISSION = 20
+    }
 }

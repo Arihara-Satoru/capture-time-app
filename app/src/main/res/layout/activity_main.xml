@@ -1,42 +1,293 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:background="#F5F7F4" android:orientation="vertical">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:background="#123C35" android:orientation="vertical" android:padding="20dp">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
-            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                android:text="拍摄时间修正" android:textColor="#FFFFFF" android:textSize="25sp" android:textStyle="bold" />
-            <Button android:id="@+id/settingsButton" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:backgroundTint="#2C665A" android:text="设置" android:textColor="#FFFFFF" />
-        </LinearLayout>
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp"
-            android:text="本机照片 · 安全预览与可逆修正" android:textColor="#B7D8C9" android:textSize="14sp" />
-    </LinearLayout>
-    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-            <TextView android:id="@+id/permissionStatus" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:background="#E2EEE9" android:padding="14dp" android:textColor="#16473E" android:textSize="14sp" />
-            <Button android:id="@+id/permissionButton" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="8dp" android:text="管理存储权限" />
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
 
-            <TextView style="@style/SectionTitle" android:text="扫描预览" />
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                <Button android:id="@+id/scanButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="重新扫描" />
-                <ProgressBar android:id="@+id/scanProgress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical" android:layout_marginStart="12dp" android:visibility="gone" />
+    <com.google.android.material.appbar.MaterialToolbar
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorSurface"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        app:title="拍摄时间修正"
+        app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/settingsButton"
+            style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="end"
+            android:contentDescription="打开设置"
+            app:icon="@drawable/ic_settings"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp" />
+    </com.google.android.material.appbar.MaterialToolbar>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="32dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="选择照片范围"
+                android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
+                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="从系统相册选择指定照片，或检查设备中的全部相册目录。扫描过程只读。"
+                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="?attr/colorPrimaryContainer"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:contentDescription="@null"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_gallery"
+                            app:tint="?attr/colorOnPrimaryContainer" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="自定义导入"
+                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                            android:textColor="?attr/colorOnPrimaryContainer"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:text="打开系统相册，多选照片"
+                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                            android:textColor="?attr/colorOnPrimaryContainer" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/galleryButton"
+                            style="@style/Widget.Material3.Button"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:minHeight="48dp"
+                            android:text="打开相册"
+                            app:icon="@drawable/ic_add_photo" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="?attr/colorSecondaryContainer"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:contentDescription="@null"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_scan"
+                            app:tint="?attr/colorOnSecondaryContainer" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="全局扫描"
+                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                            android:textColor="?attr/colorOnSecondaryContainer"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="40dp"
+                            android:text="检查 DCIM、Pictures 等目录"
+                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                            android:textColor="?attr/colorOnSecondaryContainer" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/scanButton"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:minHeight="48dp"
+                            android:text="全局扫描"
+                            app:icon="@drawable/ic_scan" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
-            <TextView android:id="@+id/scanSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="10dp" android:text="尚未扫描" android:textColor="#52635D" />
-            <androidx.recyclerview.widget.RecyclerView android:id="@+id/photoList" android:layout_width="match_parent" android:layout_height="420dp" android:clipToPadding="false" android:paddingBottom="8dp" />
 
-            <TextView style="@style/SectionTitle" android:text="单张试运行" />
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="先选中一张候选。写入前会再次检查权限、时间和路径。" android:textColor="#52635D" />
-            <Button android:id="@+id/trialButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:enabled="false" android:text="确认单张试运行" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <TextView style="@style/SectionTitle" android:text="批量执行" />
-            <TextView android:id="@+id/batchStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="需先完成一张 JPEG 试运行" android:textColor="#A14B16" />
-            <Button android:id="@+id/batchButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:enabled="false" android:text="查看风险并确认批量执行" />
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="候选预览"
+                    android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textStyle="bold" />
 
-            <TextView android:id="@+id/resultText" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="14dp" android:textColor="#16473E" android:textIsSelectable="true" />
+                <ProgressBar
+                    android:id="@+id/scanProgress"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/scanSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="尚未选择照片范围"
+                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/photoList"
+                android:layout_width="match_parent"
+                android:layout_height="400dp"
+                android:layout_marginTop="12dp"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="true"
+                android:paddingBottom="8dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="安全执行"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="先选中候选并完成一张 JPEG 试运行，再开放批量处理。每张照片都会先备份。"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/trialButton"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:enabled="false"
+                        android:minHeight="48dp"
+                        android:text="单张安全试运行"
+                        app:icon="@drawable/ic_shield" />
+
+                    <TextView
+                        android:id="@+id/batchStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="需先完成一张 JPEG 试运行"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/batchButton"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:enabled="false"
+                        android:minHeight="48dp"
+                        android:text="查看风险并批量执行"
+                        app:icon="@drawable/ic_batch" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:id="@+id/resultText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="?attr/colorSurfaceContainer"
+                android:padding="16dp"
+                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textIsSelectable="true" />
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 </LinearLayout>

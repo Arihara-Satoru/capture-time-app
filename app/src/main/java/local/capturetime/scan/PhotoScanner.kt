@@ -33,6 +33,15 @@ class PhotoScanner(
             .toList()
     }
 
+    fun scan(files: List<File>): List<PhotoRecord> {
+        val storage = Environment.getExternalStorageDirectory()
+        return files.asSequence()
+            .distinctBy { it.absolutePath.lowercase(Locale.ROOT) }
+            .map { inspect(it, listOf(storage), mediaStore.query(it)) }
+            .sortedBy { it.file.absolutePath.lowercase(Locale.ROOT) }
+            .toList()
+    }
+
     private fun inspect(file: File, roots: List<File>, indexedMedia: local.capturetime.model.MediaSnapshot?): PhotoRecord {
         val format = detectFormat(file)
         if (!PathPolicy.isSafeFile(file, roots)) return skipped(file, format, "路径不安全或位于排除目录")

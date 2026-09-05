@@ -1,19 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#386A5F</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#BBEBDD</item>
+        <item name="colorOnPrimaryContainer">#00201B</item>
+        <item name="colorSecondaryContainer">#CEE9E1</item>
+        <item name="colorOnSecondaryContainer">#0B1F1A</item>
+        <item name="colorSurface">#F6FBF8</item>
+        <item name="colorSurfaceContainer">#EAEFEB</item>
+        <item name="colorSurfaceContainerHigh">#E4E9E5</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#176B5B</item>
-        <item name="android:navigationBarColor">#F4F1E8</item>
-        <item name="android:statusBarColor">#173B35</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
-    <style name="SectionTitle" parent="android:style/TextAppearance.Material.Title">
+
+    <style name="SectionTitle" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:paddingTop">20dp</item>
-        <item name="android:paddingBottom">8dp</item>
-        <item name="android:textColor">#173B35</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">18sp</item>
+    </style>
+
+    <style name="SettingsCheckBox" parent="Widget.Material3.CompoundButton.CheckBox">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+
+    <style name="PhotoThumbnailShape">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
     </style>
 </resources>

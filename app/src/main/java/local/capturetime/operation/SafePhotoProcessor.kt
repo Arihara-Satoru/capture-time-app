@@ -31,7 +31,7 @@ class SafePhotoProcessor(
         if (!record.file.isFile || !record.file.canWrite()) return failure(record, "原文件不存在或不可写")
 
         val storage = Environment.getExternalStorageDirectory()
-        val roots = allowedRoots(storage)
+        val roots = listOf(storage)
         if (!PathPolicy.isSafeFile(record.file, roots)) return failure(record, "写入前路径安全校验失败")
         val relative = PathPolicy.relativeStoragePath(record.file, storage)
             ?: return failure(record, "原路径不在共享存储内")
@@ -157,15 +157,6 @@ class SafePhotoProcessor(
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    private fun allowedRoots(storage: File): List<File> {
-        val top = storage.listFiles().orEmpty()
-        val dcim = top.filter { it.isDirectory && it.name.equals("DCIM", true) }
-        val pictures = top.filter { it.isDirectory && it.name.equals("Pictures", true) }
-        val download = top.firstOrNull { it.isDirectory && it.name.equals("Download", true) }
-        val miShare = download?.listFiles()?.filter { it.isDirectory && it.name.equals("MiShare", true) }.orEmpty()
-        return dcim + pictures + miShare
     }
 
     private fun failure(record: PhotoRecord, reason: String, backup: String? = null, isFailure: Boolean = false) =
