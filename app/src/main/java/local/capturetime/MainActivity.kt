@@ -13,6 +13,12 @@ import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.Space
+import android.graphics.Bitmap
+import android.media.ThumbnailUtils
+import android.util.Size
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import local.capturetime.exif.ExifGateway
@@ -82,7 +88,7 @@ class MainActivity : Activity() {
         reloadTimeRule()
         snapshotStore = ScanSnapshotStore(this)
         adapter = PhotoAdapter { record -> selected = record; updateActions() }
-        duplicateAdapter = DuplicateAdapter(::updateDuplicateActions)
+        duplicateAdapter = DuplicateAdapter(::updateDuplicateActions, ::showDuplicateComparison)
         findViewById<RecyclerView>(R.id.photoList).apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = this@MainActivity.adapter
@@ -348,6 +354,54 @@ class MainActivity : Activity() {
 
     private fun updateDuplicateActions() {
         duplicateDeleteButton.isEnabled = hasStorageAccess() && duplicateAdapter.selected().isNotEmpty() && duplicateProgress.visibility != View.VISIBLE
+    }
+
+    private fun showDuplicateComparison(candidate: DuplicateCandidate) {
+        val dialogView = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(16, 0, 16, 0)
+        }
+        val deletePanel = comparisonPanel("待处理", candidate.delete.file, candidate.delete.width, candidate.delete.height, candidate.delete.size)
+        val retainedPanel = comparisonPanel("保留", candidate.retained.file, candidate.retained.width, candidate.retained.height, candidate.retained.size)
+        dialogView.addView(deletePanel, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        dialogView.addView(Space(this), LinearLayout.LayoutParams(12, 1))
+        dialogView.addView(retainedPanel, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        MaterialAlertDialogBuilder(this)
+            .setTitle("照片比对")
+            .setMessage("请确认待处理照片确实是你要删除的副本。当前候选规则：${candidate.reason}")
+            .setView(dialogView)
+            .setPositiveButton("关闭", null)
+            .show()
+    }
+
+    private fun comparisonPanel(label: String, file: File, width: Int, height: Int, size: Long): LinearLayout {
+        val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val title = TextView(this).apply {
+            text = label
+            textSize = 16f
+        }
+        val image = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, 180)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setImageResource(android.R.drawable.ic_menu_gallery)
+            contentDescription = "${label}照片预览"
+        }
+        val info = TextView(this).apply {
+            text = "${file.name}\n${width}×${height} · ${formatBytes(size)}\n${file.parent}"
+            textSize = 12f
+        }
+        panel.addView(title)
+        panel.addView(image)
+        panel.addView(info)
+        Thread {
+            val bitmap: Bitmap? = runCatching {
+                if (file.extension.lowercase() in setOf("mp4", "mov", "mkv", "3gp", "webm")) {
+                    ThumbnailUtils.createVideoThumbnail(file, Size(480, 480), null)
+                } else ThumbnailUtils.createImageThumbnail(file, Size(480, 480), null)
+            }.getOrNull()
+            image.post { if (bitmap != null) image.setImageBitmap(bitmap) }
+        }.start()
+        return panel
     }
 
     private fun setDuplicateBusy(busy: Boolean, message: String = "") {

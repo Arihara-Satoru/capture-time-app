@@ -4,12 +4,18 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
+import android.widget.ImageView
 import android.widget.TextView
+import android.media.ThumbnailUtils
+import android.util.Size
 import androidx.recyclerview.widget.RecyclerView
 import local.capturetime.duplicate.DuplicateCandidate
 import java.util.Locale
 
-class DuplicateAdapter(private val onSelectionChanged: () -> Unit) : RecyclerView.Adapter<DuplicateAdapter.Holder>() {
+class DuplicateAdapter(
+    private val onSelectionChanged: () -> Unit,
+    private val onCompare: (DuplicateCandidate) -> Unit
+) : RecyclerView.Adapter<DuplicateAdapter.Holder>() {
     private var items: List<DuplicateCandidate> = emptyList()
     private val selectedPaths = linkedSetOf<String>()
 
@@ -32,9 +38,25 @@ class DuplicateAdapter(private val onSelectionChanged: () -> Unit) : RecyclerVie
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         private val check = view.findViewById<CheckBox>(R.id.duplicateCheck)
         private val details = view.findViewById<TextView>(R.id.duplicateDetails)
+        private val preview = view.findViewById<ImageView>(R.id.duplicatePreview)
+        private val compare = view.findViewById<View>(R.id.duplicateCompare)
 
         fun bind(candidate: DuplicateCandidate) {
             val path = candidate.delete.file.absolutePath
+            preview.tag = path
+            preview.setImageResource(android.R.drawable.ic_menu_gallery)
+            Thread {
+                val bitmap = runCatching {
+                    if (candidate.delete.kind == local.capturetime.duplicate.MediaKind.VIDEO) {
+                        ThumbnailUtils.createVideoThumbnail(candidate.delete.file, Size(192, 192), null)
+                    } else {
+                        ThumbnailUtils.createImageThumbnail(candidate.delete.file, Size(192, 192), null)
+                    }
+                }.getOrNull()
+                preview.post {
+                    if (preview.tag == path && bitmap != null) preview.setImageBitmap(bitmap)
+                }
+            }.start()
             check.setOnCheckedChangeListener(null)
             check.isChecked = path in selectedPaths
             details.text = buildString {
@@ -50,6 +72,7 @@ class DuplicateAdapter(private val onSelectionChanged: () -> Unit) : RecyclerVie
                 onSelectionChanged()
             }
             itemView.setOnClickListener { check.isChecked = !check.isChecked }
+            compare.setOnClickListener { onCompare(candidate) }
         }
     }
 

@@ -1,28 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
     android:background="@drawable/card_photo"
     android:gravity="center_vertical"
-    android:minHeight="116dp"
+    android:minHeight="124dp"
     android:orientation="horizontal"
     android:padding="12dp">
 
-    <CheckBox
-        android:id="@+id/duplicateCheck"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:buttonTint="?attr/colorPrimary"
-        android:contentDescription="选择待删除文件" />
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/duplicatePreview"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:contentDescription="待处理照片预览"
+        android:scaleType="centerCrop"
+        android:src="@android:drawable/ic_menu_gallery"
+        app:shapeAppearanceOverlay="@style/PhotoThumbnailShape" />
 
     <TextView
         android:id="@+id/duplicateDetails"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="14dp"
         android:layout_weight="1"
         android:ellipsize="middle"
         android:maxLines="7"
-        android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
+        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+        android:textColor="?attr/colorOnSurface" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="vertical">
+
+        <CheckBox
+            android:id="@+id/duplicateCheck"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:buttonTint="?attr/colorPrimary"
+            android:contentDescription="选择待删除文件" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/duplicateCompare"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="40dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="一键比对"
+            android:textSize="12sp" />
+    </LinearLayout>
 </LinearLayout>
