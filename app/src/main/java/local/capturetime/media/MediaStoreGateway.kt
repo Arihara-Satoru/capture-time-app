@@ -5,6 +5,8 @@ import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
 import local.capturetime.model.MediaSnapshot
+import local.capturetime.duplicate.MediaDetails
+import local.capturetime.duplicate.MediaKind
 import java.io.File
 import java.time.Instant
 import java.util.HashMap
@@ -109,4 +111,40 @@ class MediaStoreGateway(private val context: Context) {
     }
 
     fun uri(snapshot: MediaSnapshot): Uri = ContentUris.withAppendedId(collection, snapshot.id)
+
+    fun queryDuplicateDetails(files: List<File>): Map<String, MediaDetails> {
+        val paths = files.mapTo(hashSetOf()) { it.absolutePath.lowercase() }
+        val result = HashMap<String, MediaDetails>()
+        queryDetails(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL), MediaKind.IMAGE, paths, result)
+        queryDetails(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL), MediaKind.VIDEO, paths, result)
+        return result
+    }
+
+    fun queryDuplicateDetails(file: File, kind: MediaKind): MediaDetails? {
+        val result = HashMap<String, MediaDetails>()
+        val target = setOf(file.absolutePath.lowercase())
+        val uri = if (kind == MediaKind.IMAGE) MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        else MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        queryDetails(uri, kind, target, result)
+        return result[file.absolutePath.lowercase()]
+    }
+
+    private fun queryDetails(uri: Uri, kind: MediaKind, paths: Set<String>, result: MutableMap<String, MediaDetails>) {
+        val projection = mutableListOf(
+            MediaStore.MediaColumns.DATA,
+            MediaStore.MediaColumns.WIDTH,
+            MediaStore.MediaColumns.HEIGHT
+        )
+        if (kind == MediaKind.VIDEO) projection += MediaStore.Video.Media.DURATION
+        context.contentResolver.query(uri, projection.toTypedArray(), null, null, null)?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val path = cursor.getString(0)?.lowercase() ?: continue
+                if (path !in paths) continue
+                val width = cursor.getInt(1)
+                val height = cursor.getInt(2)
+                val duration = if (kind == MediaKind.VIDEO && !cursor.isNull(3)) cursor.getLong(3) else 0
+                if (width > 0 && height > 0) result[path] = MediaDetails(kind, width, height, duration)
+            }
+        }
+    }
 }

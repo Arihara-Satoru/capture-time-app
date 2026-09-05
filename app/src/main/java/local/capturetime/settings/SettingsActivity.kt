@@ -86,9 +86,12 @@ class SettingsActivity : Activity() {
     }
 
     private fun requestStorageAccess() {
-        val mediaPermission = if (android.os.Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
-        if (checkSelfPermission(mediaPermission) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(mediaPermission), REQUEST_MEDIA_PERMISSION)
+        val mediaPermissions = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        } else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        val missing = mediaPermissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) {
+            requestPermissions(missing.toTypedArray(), REQUEST_MEDIA_PERMISSION)
             return
         }
         openAllFilesSettings()
@@ -96,7 +99,7 @@ class SettingsActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_MEDIA_PERMISSION && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == REQUEST_MEDIA_PERMISSION && grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
             openAllFilesSettings()
         } else if (requestCode == REQUEST_MEDIA_PERMISSION) {
             Toast.makeText(this, "照片读取权限未授予", Toast.LENGTH_LONG).show()
@@ -110,8 +113,11 @@ class SettingsActivity : Activity() {
     }
 
     private fun hasStorageAccess(): Boolean {
-        val mediaPermission = if (android.os.Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
-        return Environment.isExternalStorageManager() && checkSelfPermission(mediaPermission) == PackageManager.PERMISSION_GRANTED
+        val mediaGranted = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED &&
+                checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+        } else checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        return Environment.isExternalStorageManager() && mediaGranted
     }
 
     private fun save() {

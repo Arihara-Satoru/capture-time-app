@@ -16,6 +16,9 @@ import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import local.capturetime.exif.ExifGateway
+import local.capturetime.duplicate.DuplicateCandidate
+import local.capturetime.duplicate.DuplicateDeleteProcessor
+import local.capturetime.duplicate.DuplicateScanner
 import local.capturetime.media.MediaStoreGateway
 import local.capturetime.model.ImageFormat
 import local.capturetime.model.PhotoRecord
@@ -41,6 +44,9 @@ class MainActivity : Activity() {
     private lateinit var timeRule: TimeRuleConfig
     private lateinit var snapshotStore: ScanSnapshotStore
     private lateinit var adapter: PhotoAdapter
+    private lateinit var duplicateScanner: DuplicateScanner
+    private lateinit var duplicateProcessor: DuplicateDeleteProcessor
+    private lateinit var duplicateAdapter: DuplicateAdapter
     private var records: List<PhotoRecord> = emptyList()
     private var selected: PhotoRecord? = null
     private var jpegTrialPassed = false
@@ -49,6 +55,7 @@ class MainActivity : Activity() {
     private var lastSession: File? = null
     private var settingsOpened = false
     private var resultSource = "上次扫描"
+    private var duplicateCandidates: List<DuplicateCandidate> = emptyList()
 
     private val scanButton by lazy { findViewById<Button>(R.id.scanButton) }
     private val galleryButton by lazy { findViewById<Button>(R.id.galleryButton) }
@@ -58,20 +65,33 @@ class MainActivity : Activity() {
     private val scanSummary by lazy { findViewById<TextView>(R.id.scanSummary) }
     private val batchStatus by lazy { findViewById<TextView>(R.id.batchStatus) }
     private val resultText by lazy { findViewById<TextView>(R.id.resultText) }
+    private val duplicateScanButton by lazy { findViewById<Button>(R.id.duplicateScanButton) }
+    private val duplicateDeleteButton by lazy { findViewById<Button>(R.id.duplicateDeleteButton) }
+    private val duplicateProgress by lazy { findViewById<ProgressBar>(R.id.duplicateProgress) }
+    private val duplicateSummary by lazy { findViewById<TextView>(R.id.duplicateSummary) }
+    private val duplicateResult by lazy { findViewById<TextView>(R.id.duplicateResult) }
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         DynamicColors.applyToActivityIfAvailable(this)
         setContentView(R.layout.activity_main)
         mediaStore = MediaStoreGateway(this)
+        duplicateScanner = DuplicateScanner(mediaStore)
+        duplicateProcessor = DuplicateDeleteProcessor(this, mediaStore)
         exif = ExifGateway()
         reloadTimeRule()
         snapshotStore = ScanSnapshotStore(this)
         adapter = PhotoAdapter { record -> selected = record; updateActions() }
+        duplicateAdapter = DuplicateAdapter(::updateDuplicateActions)
         findViewById<RecyclerView>(R.id.photoList).apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = this@MainActivity.adapter
             setHasFixedSize(true)
+            itemAnimator = null
+        }
+        findViewById<RecyclerView>(R.id.duplicateList).apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = duplicateAdapter
             itemAnimator = null
         }
         findViewById<Button>(R.id.settingsButton).setOnClickListener {
@@ -81,6 +101,8 @@ class MainActivity : Activity() {
         scanButton.setOnClickListener { scanAllPhotos() }
         trialButton.setOnClickListener { confirmTrial() }
         batchButton.setOnClickListener { confirmBatch() }
+        duplicateScanButton.setOnClickListener { scanDuplicates() }
+        duplicateDeleteButton.setOnClickListener { confirmDuplicateDelete() }
         findViewById<BottomNavigationView>(R.id.bottomNavigation).setOnItemSelectedListener { item ->
             val captureSelected = item.itemId == R.id.navigationCaptureTime
             findViewById<View>(R.id.captureTimePage).visibility = if (captureSelected) View.VISIBLE else View.GONE
@@ -117,7 +139,9 @@ class MainActivity : Activity() {
         val granted = hasStorageAccess()
         scanButton.isEnabled = granted
         galleryButton.isEnabled = granted
+        duplicateScanButton.isEnabled = granted
         updateActions()
+        updateDuplicateActions()
     }
 
     private fun showPermissionPrompt() {
@@ -265,6 +289,85 @@ class MainActivity : Activity() {
             .setPositiveButton("关闭", null).show()
     }
 
+    private fun scanDuplicates() {
+        if (!ensurePermission()) return
+        setDuplicateBusy(true, "正在先枚举真实文件，再核对 MediaStore 尺寸...")
+        executor.execute {
+            val result = runCatching { duplicateScanner.scan() }
+            runOnUiThread {
+                setDuplicateBusy(false)
+                result.onSuccess { scan ->
+                    duplicateCandidates = scan.candidates
+                    duplicateAdapter.submitList(scan.candidates)
+                    val bytes = scan.candidates.sumOf { it.delete.size }
+                    duplicateSummary.text = "真实文件 ${scan.realFiles} · MediaStore 有效 ${scan.mediaFiles} · 候选 ${scan.candidates.size}"
+                    duplicateResult.text = if (scan.candidates.isEmpty()) {
+                        "没有符合当前严格规则的可删项。视频仅在原名与六码副本的分辨率、时长和字节数完全一致时列出。"
+                    } else "默认已勾选全部候选，预计释放 ${formatBytes(bytes)}。可逐项取消；执行前还会重新核验并建立新备份会话。"
+                }.onFailure { showDuplicateError("重复项扫描失败：${it.message}") }
+            }
+        }
+    }
+
+    private fun confirmDuplicateDelete() {
+        val selectedCandidates = duplicateAdapter.selected()
+        if (selectedCandidates.isEmpty()) return
+        val bytes = selectedCandidates.sumOf { it.delete.size }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("确认备份并删除？")
+            .setMessage("将处理 ${selectedCandidates.size} 个严格候选，约 ${formatBytes(bytes)}。\n\n每项先重新核验真实路径、尺寸/时长、实际大小和 SHA-256，再按原始相对路径复制到新的 /sdcard/.temp/duplicate-cleanup-* 会话；只有逐字节一致才删除原件。已有 .temp 备份绝不删除。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确认执行") { _, _ -> deleteDuplicates(selectedCandidates) }
+            .show()
+    }
+
+    private fun deleteDuplicates(candidates: List<DuplicateCandidate>) {
+        if (!ensurePermission()) return
+        setDuplicateBusy(true, "正在逐项复核、备份并删除...")
+        executor.execute {
+            val result = runCatching { duplicateProcessor.delete(candidates) }
+            val rescan = result.getOrNull()?.let { runCatching { duplicateScanner.scan() } }
+            runOnUiThread {
+                setDuplicateBusy(false)
+                result.onSuccess { outcome ->
+                    rescan?.onSuccess { scan ->
+                        duplicateCandidates = scan.candidates
+                        duplicateAdapter.submitList(scan.candidates)
+                        duplicateSummary.text = "复扫后候选 ${scan.candidates.size} · 本批删除 ${outcome.deleted} · 跳过 ${outcome.skipped}"
+                    }
+                    duplicateResult.text = buildString {
+                        append("本批删除 ").append(outcome.deleted).append("，跳过 ").append(outcome.skipped).append("。\n会话：").append(outcome.sessionDirectory.absolutePath)
+                        append("\n日志：deleted.tsv；原路径、保留文件和备份均已逐项核验。")
+                        if (outcome.failures.isNotEmpty()) append("\n\n").append(outcome.failures.joinToString("\n"))
+                        rescan?.exceptionOrNull()?.let { append("\n\n删除完成，但剩余文件复扫失败：").append(it.message) }
+                    }
+                }.onFailure { showDuplicateError("无法执行重复清理：${it.message}") }
+            }
+        }
+    }
+
+    private fun updateDuplicateActions() {
+        duplicateDeleteButton.isEnabled = hasStorageAccess() && duplicateAdapter.selected().isNotEmpty() && duplicateProgress.visibility != View.VISIBLE
+    }
+
+    private fun setDuplicateBusy(busy: Boolean, message: String = "") {
+        duplicateProgress.visibility = if (busy) View.VISIBLE else View.GONE
+        duplicateScanButton.isEnabled = !busy && hasStorageAccess()
+        duplicateDeleteButton.isEnabled = false
+        if (message.isNotBlank()) duplicateResult.text = message
+        if (!busy) updateDuplicateActions()
+    }
+
+    private fun showDuplicateError(message: String) {
+        duplicateResult.text = message
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    private fun formatBytes(bytes: Long): String = when {
+        bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / 1024.0 / 1024.0)
+        else -> "%.1f KB".format(bytes / 1024.0)
+    }
+
     private fun updateActions() {
         val granted = hasStorageAccess()
         trialButton.isEnabled = granted && selected?.candidate == true && selected?.safeForTrial == true
@@ -290,8 +393,11 @@ class MainActivity : Activity() {
     private fun showError(message: String) { resultText.text = message; Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
 
     private fun hasStorageAccess(): Boolean {
-        val mediaPermission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
-        return Environment.isExternalStorageManager() && checkSelfPermission(mediaPermission) == PackageManager.PERMISSION_GRANTED
+        val mediaGranted = if (Build.VERSION.SDK_INT >= 33) {
+            checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED &&
+                checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+        } else checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        return Environment.isExternalStorageManager() && mediaGranted
     }
 
     private fun reloadTimeRule(rule: TimeRuleConfig = TimeRuleConfig.load(this)) {

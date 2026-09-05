@@ -3,7 +3,7 @@ package local.capturetime.security
 import java.io.File
 
 object PathPolicy {
-    private val excludedExact = setOf(".globaltrash", ".thumbnails")
+    private val excludedExact = setOf(".globaltrash", ".thumbnails", ".temp")
 
     fun isExcluded(file: File): Boolean = file.invariantSeparatorsPath
         .split('/')
