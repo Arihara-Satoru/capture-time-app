@@ -21,6 +21,7 @@ import android.media.ThumbnailUtils
 import android.util.Size
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.appcompat.app.AlertDialog
 import local.capturetime.exif.ExifGateway
 import local.capturetime.duplicate.DuplicateCandidate
 import local.capturetime.duplicate.DuplicateDeleteProcessor
@@ -62,6 +63,7 @@ class MainActivity : Activity() {
     private var settingsOpened = false
     private var resultSource = "上次扫描"
     private var duplicateCandidates: List<DuplicateCandidate> = emptyList()
+    private var processingDialog: AlertDialog? = null
 
     private val scanButton by lazy { findViewById<Button>(R.id.scanButton) }
     private val galleryButton by lazy { findViewById<Button>(R.id.galleryButton) }
@@ -262,6 +264,7 @@ class MainActivity : Activity() {
 
     private fun runSession(selectedRecords: List<PhotoRecord>, trial: Boolean) {
         if (!ensurePermission()) return
+        showProcessingDialog(if (trial) "正在安全试运行" else "正在批量执行", if (trial) "正在备份、修改并核验照片，请稍候…" else "正在逐张备份、修改并核验照片，请勿退出应用…")
         setBusy(true, if (trial) "正在执行单张安全链路..." else "正在逐张执行批量安全链路...")
         executor.execute {
             val outcome = runCatching {
@@ -272,6 +275,7 @@ class MainActivity : Activity() {
                 session to results
             }
             runOnUiThread {
+                dismissProcessingDialog()
                 setBusy(false, "")
                 outcome.onSuccess { (session, results) ->
                     lastSession = session.directory
@@ -279,10 +283,19 @@ class MainActivity : Activity() {
                         unlockedFormats += results.single().record.format
                         if (results.single().record.format == ImageFormat.JPEG) jpegTrialPassed = true
                     }
+                    val successfulPaths = results.filter { it.success }.mapTo(hashSetOf()) { it.record.file.absolutePath }
                     results.filter { it.success }.forEach { completedPaths += it.record.file.absolutePath }
+                    if (successfulPaths.isNotEmpty()) {
+                        records = records.filterNot { it.file.absolutePath in successfulPaths }
+                        snapshotStore.save(records)
+                        selected = null
+                        adapter.clearSelection()
+                        renderRecords(false)
+                    }
                     val success = results.count { it.success }; val restored = results.count { it.restored }
-                    resultText.text = "本次成功 $success，恢复 $restored，失败 ${results.size - success}。\n会话：${session.directory.absolutePath}\n\n未触碰 .globalTrash；未修改文件名和添加时间；未删除照片。"
+                    resultText.text = "本次成功 $success，恢复 $restored，失败 ${results.size - success}。已成功修改的照片已从候选预览移除。"
                     updateActions()
+                    showSessionLog(session.directory, success, restored, results.size - success)
                 }.onFailure { showError("无法执行：${it.message}") }
             }
         }
@@ -293,6 +306,31 @@ class MainActivity : Activity() {
         val summary = File(directory, "summary.json").takeIf { it.isFile }?.readText().orEmpty()
         MaterialAlertDialogBuilder(this).setTitle("最近会话日志").setMessage("$summary\n\n目录：${directory.absolutePath}\n包含 planned.tsv、changed.tsv、skipped.tsv、restored.tsv。")
             .setPositiveButton("关闭", null).show()
+    }
+
+    private fun showSessionLog(directory: File, success: Int, restored: Int, failed: Int) {
+        val summary = File(directory, "summary.json").takeIf { it.isFile }?.readText().orEmpty()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("执行完成 · 会话日志")
+            .setMessage("成功 $success · 恢复 $restored · 失败 $failed\n\n$summary\n\n目录：${directory.absolutePath}\n包含 planned.tsv、changed.tsv、skipped.tsv、restored.tsv。")
+            .setPositiveButton("关闭", null)
+            .show()
+    }
+
+    private fun showProcessingDialog(title: String, message: String) {
+        processingDialog?.dismiss()
+        processingDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setView(ProgressBar(this).apply { isIndeterminate = true })
+            .setCancelable(false)
+            .create()
+            .also { it.setCanceledOnTouchOutside(false); it.show() }
+    }
+
+    private fun dismissProcessingDialog() {
+        processingDialog?.dismiss()
+        processingDialog = null
     }
 
     private fun scanDuplicates() {
