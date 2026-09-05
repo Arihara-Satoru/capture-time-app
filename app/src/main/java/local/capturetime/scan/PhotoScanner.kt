@@ -14,37 +14,51 @@ import java.io.File
 import java.io.FileInputStream
 import java.time.Instant
 import java.util.Locale
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 
 class PhotoScanner(
     private val mediaStore: MediaStoreGateway,
     private val exif: ExifGateway,
     private val rule: TimeRuleConfig = TimeRuleConfig()
 ) {
+    private val inspectionThreads = Executors.newFixedThreadPool(availableInspectionThreads())
+
     fun scan(): List<PhotoRecord> {
         val storage = Environment.getExternalStorageDirectory()
         val roots = resolveRoots(storage)
         val mediaIndex = mediaStore.queryAll()
-        return roots.asSequence()
+        val files = roots.asSequence()
             .flatMap { walkFiles(it) }
             .filter { looksLikeImageName(it.name) }
             .distinctBy { it.absolutePath.lowercase(Locale.ROOT) }
-            .map { inspect(it, roots, mediaIndex[it.absolutePath.lowercase()]) }
-            .sortedBy { it.file.absolutePath.lowercase(Locale.ROOT) }
             .toList()
+        return inspectInParallel(files, roots) { file -> mediaIndex[file.absolutePath.lowercase(Locale.ROOT)] }
     }
 
     fun scan(files: List<File>): List<PhotoRecord> {
         val storage = Environment.getExternalStorageDirectory()
-        return files.asSequence()
+        val uniqueFiles = files.asSequence()
             .distinctBy { it.absolutePath.lowercase(Locale.ROOT) }
-            .map { inspect(it, listOf(storage), mediaStore.query(it)) }
-            .sortedBy { it.file.absolutePath.lowercase(Locale.ROOT) }
             .toList()
+        // Avoid one ContentResolver query per photo when importing a selection.
+        val mediaIndex = mediaStore.queryAll()
+        return inspectInParallel(uniqueFiles, listOf(storage)) { file -> mediaIndex[file.absolutePath.lowercase(Locale.ROOT)] }
+    }
+
+    private fun inspectInParallel(
+        files: List<File>,
+        roots: List<File>,
+        mediaFor: (File) -> local.capturetime.model.MediaSnapshot?
+    ): List<PhotoRecord> {
+        val tasks = files.map { file -> Callable { inspect(file, roots, mediaFor(file)) } }
+        return inspectionThreads.invokeAll(tasks).map { it.get() }
+            .sortedBy { it.file.absolutePath.lowercase(Locale.ROOT) }
     }
 
     private fun inspect(file: File, roots: List<File>, indexedMedia: local.capturetime.model.MediaSnapshot?): PhotoRecord {
+        if (!PathPolicy.isSafeFile(file, roots)) return skipped(file, ImageFormat.OTHER, "路径不安全或位于排除目录")
         val format = detectFormat(file)
-        if (!PathPolicy.isSafeFile(file, roots)) return skipped(file, format, "路径不安全或位于排除目录")
         if (format == ImageFormat.OTHER) return skipped(file, format, "扩展名与文件签名不匹配或格式不支持")
 
         val rawExif = runCatching { exif.readRaw(file) }.getOrNull()
@@ -136,4 +150,7 @@ class PhotoScanner(
             else -> ImageFormat.OTHER
         }
     }
+
+    private fun availableInspectionThreads(): Int =
+        Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
 }

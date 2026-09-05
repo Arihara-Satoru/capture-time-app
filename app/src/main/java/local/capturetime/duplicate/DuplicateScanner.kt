@@ -23,16 +23,20 @@ class DuplicateScanner(private val mediaStore: MediaStoreGateway) {
             if (details.width <= 0 || details.height <= 0) return@mapNotNull null
             DuplicateAsset(file, details.kind, details.width, details.height, details.durationMillis, file.length())
         }
-        val candidates = DuplicateRules.findCandidates(assets).map { candidate ->
+        val candidates = DuplicateRules.findCandidates(assets)
+        val hashCache = HashMap<String, String>()
+        val hashedCandidates = candidates.map { candidate ->
             candidate.copy(
-                delete = candidate.delete.withHash(),
-                retained = candidate.retained.withHash()
+                delete = candidate.delete.withHash(hashCache),
+                retained = candidate.retained.withHash(hashCache)
             )
         }
-        return DuplicateScanResult(realFiles.size, assets.size, candidates)
+        return DuplicateScanResult(realFiles.size, assets.size, hashedCandidates)
     }
 
-    private fun DuplicateAsset.withHash() = copy(sha256 = FileVerification.sha256(file))
+    private fun DuplicateAsset.withHash(cache: MutableMap<String, String>) = copy(
+        sha256 = cache.getOrPut(file.absolutePath.lowercase(Locale.ROOT)) { FileVerification.sha256(file) }
+    )
 
     private fun resolveRoots(storage: File): List<File> {
         val children = storage.listFiles().orEmpty()
