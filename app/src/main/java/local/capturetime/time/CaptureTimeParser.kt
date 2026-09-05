@@ -21,21 +21,29 @@ object CaptureTimeParser {
         Regex("(?<!\\d)(\\d{8}-\\d{6})(?!\\d)") to
             DateTimeFormatter.ofPattern("uuuuMMdd-HHmmss")
     )
+    private val epochMillisPattern = Regex("(?<!\\d)(\\d{13})(?!\\d)")
+    private val earliestFilenameTime = Instant.parse("2000-01-01T00:00:00Z")
+    private val latestFilenameTime = Instant.parse("2100-01-01T00:00:00Z")
 
     fun parseExif(value: String?): Instant? = parseLocal(value, exifFormatter)
 
     fun parseFilename(filenameWithoutExtension: String): Instant? {
-        val parsed = filenamePatterns.flatMap { (regex, formatter) ->
-            regex.findAll(filenameWithoutExtension).mapNotNull { parseLocal(it.groupValues[1], formatter) }
-        }.distinct().toList()
-        return parsed.singleOrNull()
+        return parsedFilenameTimes(filenameWithoutExtension).singleOrNull()
     }
 
     fun hasAmbiguousFilenameTime(filenameWithoutExtension: String): Boolean {
-        val parsed = filenamePatterns.flatMap { (regex, formatter) ->
+        return parsedFilenameTimes(filenameWithoutExtension).size > 1
+    }
+
+    private fun parsedFilenameTimes(filenameWithoutExtension: String): List<Instant> {
+        val formatted = filenamePatterns.flatMap { (regex, formatter) ->
             regex.findAll(filenameWithoutExtension).mapNotNull { parseLocal(it.groupValues[1], formatter) }
-        }.distinct().toList()
-        return parsed.size > 1
+        }
+        val epochMillis = epochMillisPattern.findAll(filenameWithoutExtension).mapNotNull { match ->
+            match.groupValues[1].toLongOrNull()?.let(Instant::ofEpochMilli)
+                ?.takeIf { !it.isBefore(earliestFilenameTime) && it.isBefore(latestFilenameTime) }
+        }
+        return (formatted + epochMillis).distinct().toList()
     }
 
     fun formatExif(value: Instant): String = outputFormatter.format(value)

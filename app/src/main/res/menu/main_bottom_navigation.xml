@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/navigationCaptureTime"
+        android:icon="@drawable/ic_capture_time"
+        android:title="拍摄时间纠正" />
+    <item
+        android:id="@+id/navigationDuplicatePhoto"
+        android:icon="@drawable/ic_duplicate_photo"
+        android:title="照片重复纠正" />
+</menu>

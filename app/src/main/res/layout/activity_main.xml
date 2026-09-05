@@ -8,6 +8,7 @@
     android:orientation="vertical">
 
     <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/mainToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="?attr/colorSurface"
@@ -28,10 +29,15 @@
             app:iconPadding="0dp" />
     </com.google.android.material.appbar.MaterialToolbar>
 
-    <androidx.core.widget.NestedScrollView
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="1">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/captureTimePage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:clipToPadding="false"
         android:fillViewport="true">
 
@@ -290,4 +296,23 @@
                 android:textIsSelectable="true" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
+
+        <FrameLayout
+            android:id="@+id/duplicatePhotoPage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/colorSurface"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurfaceContainer"
+        android:minHeight="80dp"
+        app:itemActiveIndicatorStyle="@style/Widget.Material3.BottomNavigationView.ActiveIndicator"
+        app:itemIconSize="24dp"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/main_bottom_navigation" />
 </LinearLayout>

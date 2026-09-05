@@ -27,6 +27,8 @@ import local.capturetime.settings.TimeRuleConfig
 import local.capturetime.time.CaptureTimeParser
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -79,6 +81,15 @@ class MainActivity : Activity() {
         scanButton.setOnClickListener { scanAllPhotos() }
         trialButton.setOnClickListener { confirmTrial() }
         batchButton.setOnClickListener { confirmBatch() }
+        findViewById<BottomNavigationView>(R.id.bottomNavigation).setOnItemSelectedListener { item ->
+            val captureSelected = item.itemId == R.id.navigationCaptureTime
+            findViewById<View>(R.id.captureTimePage).visibility = if (captureSelected) View.VISIBLE else View.GONE
+            findViewById<View>(R.id.duplicatePhotoPage).visibility = if (captureSelected) View.GONE else View.VISIBLE
+            findViewById<MaterialToolbar>(R.id.mainToolbar).title =
+                if (captureSelected) "拍摄时间纠正" else "照片重复纠正"
+            true
+        }
+        findViewById<BottomNavigationView>(R.id.bottomNavigation).selectedItemId = R.id.navigationCaptureTime
         loadSavedScan()
         updatePermissionState()
         if (state == null && !hasStorageAccess()) showPermissionPrompt()
