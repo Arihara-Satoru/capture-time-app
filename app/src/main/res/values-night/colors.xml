@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="permission_granted">#78D5BE</color>
+    <color name="permission_missing">#FFB4AB</color>
+</resources>

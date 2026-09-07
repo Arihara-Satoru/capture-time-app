@@ -35,7 +35,6 @@ import local.capturetime.scan.PhotoScanner
 import local.capturetime.scan.ScanSnapshotStore
 import local.capturetime.settings.TimeRuleConfig
 import local.capturetime.time.CaptureTimeParser
-import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -71,6 +70,7 @@ class MainActivity : Activity() {
     private val batchButton by lazy { findViewById<Button>(R.id.batchButton) }
     private val scanProgress by lazy { findViewById<ProgressBar>(R.id.scanProgress) }
     private val scanSummary by lazy { findViewById<TextView>(R.id.scanSummary) }
+    private val accessStatus by lazy { findViewById<TextView>(R.id.accessStatus) }
     private val batchStatus by lazy { findViewById<TextView>(R.id.batchStatus) }
     private val resultText by lazy { findViewById<TextView>(R.id.resultText) }
     private val duplicateScanButton by lazy { findViewById<Button>(R.id.duplicateScanButton) }
@@ -81,7 +81,6 @@ class MainActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        DynamicColors.applyToActivityIfAvailable(this)
         setContentView(R.layout.activity_main)
         mediaStore = MediaStoreGateway(this)
         duplicateScanner = DuplicateScanner(mediaStore)
@@ -145,6 +144,8 @@ class MainActivity : Activity() {
 
     private fun updatePermissionState() {
         val granted = hasStorageAccess()
+        accessStatus.text = if (granted) "权限已授予 · 仅在本机处理" else "需要照片与所有文件访问权限"
+        accessStatus.setTextColor(getColor(if (granted) R.color.permission_granted else R.color.permission_missing))
         scanButton.isEnabled = granted
         galleryButton.isEnabled = granted
         duplicateScanButton.isEnabled = granted
@@ -171,7 +172,7 @@ class MainActivity : Activity() {
         if (saved.isEmpty()) return
         records = saved
         renderRecords(false)
-        resultText.text = "已读取上次扫描记录。照片未被读取或写入。请选择相册导入或全局扫描以获取最新状态。"
+        showStatus("已读取上次扫描记录。照片未被读取或写入。请选择相册导入或全局扫描以获取最新状态。")
     }
 
     private fun scanAllPhotos() {
@@ -244,7 +245,7 @@ class MainActivity : Activity() {
         val candidates = records.filter { it.candidate }
         adapter.submitList(candidates)
         scanSummary.text = "$resultSource · 已检查 ${records.size} 张 · 候选 ${candidates.size} 张"
-        if (fresh) resultText.text = if (records.isEmpty()) "范围内没有可识别图片。" else "扫描记录已保存到应用本机空间。请选择候选进行单张试运行。"
+        if (fresh) showStatus(if (records.isEmpty()) "范围内没有可识别图片。" else "扫描记录已保存到应用本机空间。请选择候选进行单张试运行。")
         updateActions()
     }
 
@@ -293,7 +294,7 @@ class MainActivity : Activity() {
                         renderRecords(false)
                     }
                     val success = results.count { it.success }; val restored = results.count { it.restored }
-                    resultText.text = "本次成功 $success，恢复 $restored，失败 ${results.size - success}。已成功修改的照片已从候选预览移除。"
+                    showStatus("本次成功 $success，恢复 $restored，失败 ${results.size - success}。已成功修改的照片已从候选预览移除。")
                     updateActions()
                     showSessionLog(session.directory, success, restored, results.size - success)
                 }.onFailure { showError("无法执行：${it.message}") }
@@ -391,7 +392,13 @@ class MainActivity : Activity() {
     }
 
     private fun updateDuplicateActions() {
-        duplicateDeleteButton.isEnabled = hasStorageAccess() && duplicateAdapter.selected().isNotEmpty() && duplicateProgress.visibility != View.VISIBLE
+        val selected = duplicateAdapter.selected()
+        duplicateDeleteButton.isEnabled = hasStorageAccess() && selected.isNotEmpty() && duplicateProgress.visibility != View.VISIBLE
+        duplicateDeleteButton.text = if (selected.isEmpty()) {
+            "备份并删除已勾选项"
+        } else {
+            "备份并删除 ${selected.size} 项（约 ${formatBytes(selected.sumOf { it.delete.size })}）"
+        }
     }
 
     private fun showDuplicateComparison(candidate: DuplicateCandidate) {
@@ -464,7 +471,14 @@ class MainActivity : Activity() {
         val granted = hasStorageAccess()
         trialButton.isEnabled = granted && selected?.candidate == true && selected?.safeForTrial == true
         batchButton.isEnabled = granted && jpegTrialPassed && records.any { it.file.absolutePath !in completedPaths && it.candidate && it.safeForTrial && (it.format == ImageFormat.JPEG || it.format in unlockedFormats) }
-        batchStatus.text = when { !jpegTrialPassed -> "需先完成一张 JPEG 试运行"; batchButton.isEnabled -> "JPEG 安全链路已通过，可批量确认"; else -> "当前没有可批量处理的候选" }
+        batchStatus.text = when {
+            !granted -> "请先在设置中授予照片和所有文件访问权限"
+            selected == null -> "从候选列表选择一张照片后即可试运行"
+            selected?.safeForTrial != true -> "所选照片尚不满足安全试运行条件"
+            !jpegTrialPassed -> "已选择 ${selected?.file?.name}；需先完成一张 JPEG 试运行"
+            batchButton.isEnabled -> "JPEG 安全链路已通过，可批量确认"
+            else -> "当前没有可批量处理的候选"
+        }
     }
 
     private fun setBusy(busy: Boolean, message: String) {
@@ -472,7 +486,7 @@ class MainActivity : Activity() {
         scanButton.isEnabled = !busy && hasStorageAccess()
         galleryButton.isEnabled = !busy && hasStorageAccess()
         trialButton.isEnabled = false; batchButton.isEnabled = false
-        if (message.isNotBlank()) resultText.text = message
+        if (message.isNotBlank()) showStatus(message)
         if (!busy) updateActions()
     }
 
@@ -482,7 +496,8 @@ class MainActivity : Activity() {
         updatePermissionState()
         return false
     }
-    private fun showError(message: String) { resultText.text = message; Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
+    private fun showStatus(message: String) { resultText.text = message; resultText.visibility = View.VISIBLE }
+    private fun showError(message: String) { showStatus(message); Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
 
     private fun hasStorageAccess(): Boolean {
         val mediaGranted = if (Build.VERSION.SDK_INT >= 33) {

@@ -10,8 +10,6 @@ import local.capturetime.model.PhotoRecord
 import local.capturetime.time.CaptureTimeParser
 import android.media.ThumbnailUtils
 import android.util.Size
-import android.graphics.Bitmap
-import java.io.File
 import java.util.concurrent.Executors
 
 class PhotoAdapter(private val onSelected: (PhotoRecord) -> Unit) : RecyclerView.Adapter<PhotoAdapter.Holder>() {
@@ -31,6 +29,10 @@ class PhotoAdapter(private val onSelected: (PhotoRecord) -> Unit) : RecyclerView
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         private val details = view.findViewById<TextView>(R.id.itemDetails)
         private val preview = view.findViewById<ImageView>(R.id.itemPreview)
+        private val title = view.findViewById<TextView>(R.id.itemTitle)
+        private val format = view.findViewById<TextView>(R.id.itemFormat)
+        private val target = view.findViewById<TextView>(R.id.itemTarget)
+        private val path = view.findViewById<TextView>(R.id.itemPath)
 
         fun bind(record: PhotoRecord) {
             preview.tag = record.file.absolutePath
@@ -44,15 +46,12 @@ class PhotoAdapter(private val onSelected: (PhotoRecord) -> Unit) : RecyclerView
                 }
             }
             itemView.isSelected = selectedPath == record.file.absolutePath
-            details.text = buildString {
-                append("文件名：").append(record.file.name).append('\n')
-                append("格式：").append(record.format.label).append('\n')
-                append("当前拍摄：").append(CaptureTimeParser.formatDisplay(record.currentCaptureTime)).append('\n')
-                append("添加时间：").append(CaptureTimeParser.formatDisplay(record.media?.dateAdded)).append('\n')
-                append("文件名时间：").append(CaptureTimeParser.formatDisplay(record.filenameTime)).append('\n')
-                append("规则目标：").append(CaptureTimeParser.formatDisplay(record.targetCaptureTime)).append('\n')
-                append("路径：").append(record.file.parent ?: record.file.absolutePath)
-            }
+            title.text = record.file.name
+            format.text = " ${record.format.label} · ${if (record.safeForTrial) "可安全试运行" else "需人工确认"} "
+            target.text = "目标时间 · ${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}"
+            details.text = "当前 ${CaptureTimeParser.formatDisplay(record.currentCaptureTime)}\n添加 ${CaptureTimeParser.formatDisplay(record.media?.dateAdded)} · 文件名 ${CaptureTimeParser.formatDisplay(record.filenameTime)}"
+            path.text = record.file.parent ?: record.file.absolutePath
+            itemView.contentDescription = "${record.file.name}，${record.format.label}，目标时间 ${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}。${if (itemView.isSelected) "已选择" else "双击选择"}"
             itemView.setOnClickListener {
                 selectedPath = record.file.absolutePath
                 itemView.isSelected = true

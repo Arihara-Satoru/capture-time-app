@@ -40,6 +40,9 @@ class DuplicateAdapter(
         private val details = view.findViewById<TextView>(R.id.duplicateDetails)
         private val preview = view.findViewById<ImageView>(R.id.duplicatePreview)
         private val compare = view.findViewById<View>(R.id.duplicateCompare)
+        private val title = view.findViewById<TextView>(R.id.duplicateTitle)
+        private val retained = view.findViewById<TextView>(R.id.duplicateRetained)
+        private val pathText = view.findViewById<TextView>(R.id.duplicatePath)
 
         fun bind(candidate: DuplicateCandidate) {
             val path = candidate.delete.file.absolutePath
@@ -59,16 +62,15 @@ class DuplicateAdapter(
             }.start()
             check.setOnCheckedChangeListener(null)
             check.isChecked = path in selectedPaths
-            details.text = buildString {
-                append("处理：").append(candidate.delete.file.name).append('\n')
-                append("保留：").append(candidate.retained.file.name).append('\n')
-                append("尺寸：").append(candidate.delete.width).append('×').append(candidate.delete.height)
-                append(" · ").append(formatBytes(candidate.delete.size)).append('\n')
-                append(candidate.reason).append('\n')
-                append("目录：").append(candidate.delete.file.parent)
-            }
+            itemView.isSelected = check.isChecked
+            title.text = "处理：${candidate.delete.file.name}"
+            retained.text = "保留：${candidate.retained.file.name}"
+            details.text = "${candidate.delete.width}×${candidate.delete.height} · ${formatBytes(candidate.delete.size)}\n${candidate.reason}"
+            pathText.text = candidate.delete.file.parent
+            itemView.contentDescription = "待处理 ${candidate.delete.file.name}，保留 ${candidate.retained.file.name}，${if (check.isChecked) "已选择" else "未选择"}"
             check.setOnCheckedChangeListener { _, checked ->
                 if (checked) selectedPaths += path else selectedPaths -= path
+                itemView.isSelected = checked
                 onSelectionChanged()
             }
             itemView.setOnClickListener { check.isChecked = !check.isChecked }

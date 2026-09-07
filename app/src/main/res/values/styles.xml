@@ -1,26 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">#386A5F</item>
+        <item name="colorPrimary">#146B5D</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#BBEBDD</item>
-        <item name="colorOnPrimaryContainer">#00201B</item>
-        <item name="colorSecondaryContainer">#CEE9E1</item>
-        <item name="colorOnSecondaryContainer">#0B1F1A</item>
-        <item name="colorSurface">#F6FBF8</item>
-        <item name="colorSurfaceContainer">#EAEFEB</item>
-        <item name="colorSurfaceContainerHigh">#E4E9E5</item>
+        <item name="colorPrimaryContainer">#C8F0E3</item>
+        <item name="colorOnPrimaryContainer">#002019</item>
+        <item name="colorSecondary">#40645C</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#D9ECE5</item>
+        <item name="colorOnSecondaryContainer">#0C211B</item>
+        <item name="colorTertiary">#365F78</item>
+        <item name="colorOnTertiary">#FFFFFF</item>
+        <item name="colorTertiaryContainer">#C8E6FF</item>
+        <item name="colorOnTertiaryContainer">#001E2D</item>
+        <item name="colorError">#BA1A1A</item>
+        <item name="colorOnError">#FFFFFF</item>
+        <item name="colorErrorContainer">#FFDAD6</item>
+        <item name="colorOnErrorContainer">#410002</item>
+        <item name="colorSurface">#F8FBF9</item>
+        <item name="colorOnSurface">#191C1A</item>
+        <item name="colorSurfaceVariant">#DDE5E0</item>
+        <item name="colorOnSurfaceVariant">#414944</item>
+        <item name="colorSurfaceContainer">#EDF1EE</item>
+        <item name="colorSurfaceContainerHigh">#E7ECE8</item>
+        <item name="colorOutline">#717A74</item>
+        <item name="colorOutlineVariant">#C1C9C4</item>
         <item name="android:fontFamily">sans</item>
+        <item name="android:colorBackground">#F8FBF9</item>
         <item name="android:navigationBarColor">?attr/colorSurface</item>
         <item name="android:statusBarColor">?attr/colorSurface</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
-    <style name="SectionTitle" parent="TextAppearance.Material3.TitleMedium">
+    <style name="SectionTitle" parent="TextAppearance.Material3.TitleLarge">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:textSize">22sp</item>
+    </style>
+
+    <style name="SupportingText" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">14sp</item>
     </style>
 
     <style name="SettingsCheckBox" parent="Widget.Material3.CompoundButton.CheckBox">
@@ -29,8 +52,14 @@
         <item name="android:minHeight">48dp</item>
     </style>
 
+    <style name="DangerButton" parent="Widget.Material3.Button">
+        <item name="backgroundTint">?attr/colorError</item>
+        <item name="android:textColor">?attr/colorOnError</item>
+        <item name="iconTint">?attr/colorOnError</item>
+    </style>
+
     <style name="PhotoThumbnailShape">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">16dp</item>
+        <item name="cornerSize">14dp</item>
     </style>
 </resources>

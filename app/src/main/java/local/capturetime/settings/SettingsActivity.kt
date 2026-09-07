@@ -15,7 +15,6 @@ import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
-import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 
@@ -31,7 +30,6 @@ class SettingsActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        DynamicColors.applyToActivityIfAvailable(this)
         setContentView(local.capturetime.R.layout.activity_settings)
         days = findViewById(local.capturetime.R.id.settingDays)
         hours = findViewById(local.capturetime.R.id.settingHours)

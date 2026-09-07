@@ -3,8 +3,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
+    android:layout_marginBottom="8dp"
     android:background="@drawable/card_photo"
+    android:clickable="true"
+    android:focusable="true"
     android:gravity="center_vertical"
     android:minHeight="124dp"
     android:orientation="horizontal"
@@ -12,28 +14,63 @@
 
     <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/duplicatePreview"
-        android:layout_width="96dp"
-        android:layout_height="96dp"
+        android:layout_width="88dp"
+        android:layout_height="88dp"
         android:contentDescription="待处理照片预览"
         android:scaleType="centerCrop"
         android:src="@android:drawable/ic_menu_gallery"
         app:shapeAppearanceOverlay="@style/PhotoThumbnailShape" />
 
-    <TextView
-        android:id="@+id/duplicateDetails"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="14dp"
+        android:layout_marginStart="12dp"
         android:layout_weight="1"
-        android:ellipsize="middle"
-        android:maxLines="7"
-        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-        android:textColor="?attr/colorOnSurface" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/duplicateTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/duplicateRetained"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/SupportingText" />
+
+        <TextView
+            android:id="@+id/duplicateDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:id="@+id/duplicatePath"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="middle"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
 
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="48dp"
         android:layout_height="match_parent"
-        android:gravity="center_vertical"
+        android:gravity="center_horizontal"
         android:orientation="vertical">
 
         <CheckBox
@@ -46,12 +83,15 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/duplicateCompare"
             style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="48dp"
+            android:layout_height="40dp"
+            android:contentDescription="比对两张照片"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
             android:minHeight="40dp"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
-            android:text="一键比对"
+            android:minWidth="40dp"
+            android:padding="0dp"
+            android:text="比对"
             android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

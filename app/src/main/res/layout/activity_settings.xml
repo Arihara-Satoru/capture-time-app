@@ -10,7 +10,7 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/settingsToolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
+        android:layout_height="64dp"
         android:background="?attr/colorSurface"
         app:navigationIcon="@drawable/ic_back"
         app:title="设置"
@@ -29,38 +29,116 @@
             android:paddingStart="16dp"
             android:paddingTop="8dp"
             android:paddingEnd="16dp"
-            android:paddingBottom="32dp">
+            android:paddingBottom="24dp">
 
             <TextView style="@style/SectionTitle" android:text="照片访问" />
+
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                app:cardBackgroundColor="?attr/colorSecondaryContainer"
-                app:cardCornerRadius="24dp"
+                android:layout_marginTop="8dp"
+                app:cardBackgroundColor="?attr/colorPrimaryContainer"
+                app:cardCornerRadius="20dp"
                 app:cardElevation="0dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="所有文件访问权限" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" android:textStyle="bold" />
-                    <TextView android:id="@+id/permissionStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="仅用于读取所选本机照片、全局扫描、原地修改和创建安全备份。" android:textAppearance="@style/TextAppearance.Material3.BodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
-                    <com.google.android.material.button.MaterialButton android:id="@+id/permissionButton" style="@style/Widget.Material3.Button.TonalButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:minHeight="48dp" android:text="授权所有文件访问" app:icon="@drawable/ic_lock" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="所有文件访问权限"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textColor="?attr/colorOnPrimaryContainer"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/permissionStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="仅用于本机读取照片、原地修正和创建安全备份。"
+                        android:textAppearance="@style/SupportingText"
+                        android:textColor="?attr/colorOnPrimaryContainer" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/permissionButton"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:minHeight="48dp"
+                        android:text="授权所有文件访问"
+                        app:icon="@drawable/ic_lock" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <TextView style="@style/SectionTitle" android:layout_marginTop="24dp" android:text="时间规则" />
+            <TextView
+                style="@style/SectionTitle"
+                android:layout_marginTop="24dp"
+                android:text="时间规则" />
+
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 app:cardBackgroundColor="?attr/colorSurfaceContainer"
-                app:cardCornerRadius="24dp"
+                app:cardCornerRadius="20dp"
                 app:cardElevation="0dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="目标时间" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" android:textStyle="bold" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="从勾选且存在有效值的字段中选取。" android:textAppearance="@style/TextAppearance.Material3.BodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
-                    <Spinner android:id="@+id/timeSelection" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="6dp" />
 
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="依据字段" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" android:textStyle="bold" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="目标时间"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="从已勾选且存在有效值的字段中选取。"
+                        android:textAppearance="@style/SupportingText" />
+
+                    <Spinner
+                        android:id="@+id/timeSelection"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginTop="8dp"
+                        android:background="?attr/colorSurfaceContainerHigh"
+                        android:contentDescription="目标时间选取方式" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="依据字段"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="用于计算应写入的时间。"
+                        android:textAppearance="@style/SupportingText" />
+
                     <CheckBox android:id="@+id/sourceCurrentCapture" style="@style/SettingsCheckBox" android:text="当前拍摄时间（优先 EXIF 原始）" />
                     <CheckBox android:id="@+id/sourceExifOriginal" style="@style/SettingsCheckBox" android:text="EXIF DateTimeOriginal（原始时间）" />
                     <CheckBox android:id="@+id/sourceExifDigitized" style="@style/SettingsCheckBox" android:text="EXIF DateTimeDigitized（数字化时间）" />
@@ -70,39 +148,192 @@
                     <CheckBox android:id="@+id/sourceFilename" style="@style/SettingsCheckBox" android:text="文件名中的时间" />
                     <CheckBox android:id="@+id/sourceFileModified" style="@style/SettingsCheckBox" android:text="文件修改时间" />
 
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="16dp" android:background="?attr/colorOutlineVariant" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="修改字段" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" android:textStyle="bold" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="MediaStore 字段由 Android 管理，只读取和核验。" android:textAppearance="@style/TextAppearance.Material3.BodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="16dp"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="修改字段"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="MediaStore 字段由 Android 管理，只读取和核验。"
+                        android:textAppearance="@style/SupportingText" />
+
                     <CheckBox android:id="@+id/destinationExifOriginal" style="@style/SettingsCheckBox" android:text="EXIF DateTimeOriginal（原始时间）" />
                     <CheckBox android:id="@+id/destinationExifDigitized" style="@style/SettingsCheckBox" android:text="EXIF DateTimeDigitized（数字化时间）" />
                     <CheckBox android:id="@+id/destinationExifModified" style="@style/SettingsCheckBox" android:text="EXIF DateTime（修改时间）" />
                     <CheckBox android:id="@+id/destinationFileModified" style="@style/SettingsCheckBox" android:text="文件修改时间" />
 
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="16dp" android:background="?attr/colorOutlineVariant" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="忽略误差" android:textAppearance="@style/TextAppearance.Material3.TitleMedium" android:textStyle="bold" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="差值不超过误差时不修改；缺失字段仍会补写。" android:textAppearance="@style/TextAppearance.Material3.BodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:baselineAligned="false" android:orientation="horizontal">
-                        <EditText android:id="@+id/settingDays" style="@style/Widget.Material3.TextInputEditText.FilledBox" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:gravity="center" android:hint="0" android:inputType="number" android:maxLines="1" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="56dp" android:gravity="center" android:paddingHorizontal="5dp" android:text="天" android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
-                        <EditText android:id="@+id/settingHours" style="@style/Widget.Material3.TextInputEditText.FilledBox" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:gravity="center" android:hint="0" android:inputType="number" android:maxLines="1" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="56dp" android:gravity="center" android:paddingHorizontal="5dp" android:text="时" android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
-                        <EditText android:id="@+id/settingMinutes" style="@style/Widget.Material3.TextInputEditText.FilledBox" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:gravity="center" android:hint="0" android:inputType="number" android:maxLines="1" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="56dp" android:gravity="center" android:paddingHorizontal="5dp" android:text="分" android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
-                        <EditText android:id="@+id/settingSeconds" style="@style/Widget.Material3.TextInputEditText.FilledBox" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:gravity="center" android:hint="0" android:inputType="number" android:maxLines="1" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="56dp" android:gravity="center" android:paddingHorizontal="5dp" android:text="秒" android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="16dp"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="忽略误差"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="差值不超过误差时不修改；缺失字段仍会补写。"
+                        android:textAppearance="@style/SupportingText" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:hint="天">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/settingDays"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:hint="时">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/settingHours"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
-                    <com.google.android.material.button.MaterialButton android:id="@+id/saveSettings" style="@style/Widget.Material3.Button" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:minHeight="52dp" android:text="保存时间规则" app:icon="@drawable/ic_save" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:hint="分">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/settingMinutes"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:hint="秒">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/settingSeconds"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <TextView style="@style/SectionTitle" android:layout_marginTop="24dp" android:text="维护" />
-            <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" app:cardBackgroundColor="?attr/colorSurfaceContainer" app:cardCornerRadius="24dp" app:cardElevation="0dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
-                    <com.google.android.material.button.MaterialButton android:id="@+id/viewLogs" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="查看会话日志" app:icon="@drawable/ic_logs" />
-                    <com.google.android.material.button.MaterialButton android:id="@+id/clearBackups" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:minHeight="48dp" android:text="清除备份" android:textColor="?attr/colorError" app:icon="@drawable/ic_delete" app:iconTint="?attr/colorError" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="只删除本应用创建的备份与日志。此操作不可撤销。" android:textAppearance="@style/TextAppearance.Material3.BodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
+            <TextView
+                style="@style/SectionTitle"
+                android:layout_marginTop="24dp"
+                android:text="维护" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/viewLogs"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="查看会话日志"
+                        app:icon="@drawable/ic_logs" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/clearBackups"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:minHeight="48dp"
+                        android:text="清除备份"
+                        android:textColor="?attr/colorError"
+                        app:icon="@drawable/ic_delete"
+                        app:iconTint="?attr/colorError" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_margin="4dp"
+                        android:text="只删除本应用创建的备份与日志；此操作不可撤销。"
+                        android:textAppearance="@style/SupportingText" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/saveSettings"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="12dp"
+        android:minHeight="52dp"
+        android:text="保存时间规则"
+        app:icon="@drawable/ic_save" />
 </LinearLayout>
