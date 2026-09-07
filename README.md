@@ -31,7 +31,7 @@
 ## GitHub 自动化
 
 - 对 `main` 的推送和所有拉取请求会运行单元测试、构建 Debug APK，并将 APK 作为 Actions 构件保留。
-- 推送形如 `v1.0.0` 的版本标签会构建未签名 Release APK、生成 SHA-256 校验文件，并创建带 GitHub 自动生成发布说明的 Release。
+- 推送形如 `v1.0.0` 的版本标签会构建已签名 Release APK、生成 SHA-256 校验文件，并创建带 GitHub 自动生成发布说明的 Release。发布工作流需要仓库 Secrets 中的 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。其中 `ANDROID_KEYSTORE_BASE64` 是发布 keystore 文件的 Base64 文本；在 Linux/macOS 可用 `base64 -w 0 release.keystore` 生成。
 
 ## 安装
 
@@ -40,7 +40,7 @@
 3. 按 HyperOS 提示允许该来源安装未知应用。
 4. 完成安装后打开“拍摄时间修正”。
 
-无需 root，不需要 ADB shell。发布签名不是本地侧载的必要条件；如需长期保留同一安装，可在 Android Studio 中使用自己的签名生成 APK。
+无需 root，不需要 ADB shell。GitHub Release 的 APK 必须使用稳定的发布证书签名；首次安装和后续升级都应使用同一证书。`app-debug.apk` 仅适合开发测试，不能覆盖安装已发布版本。
 
 ## 授予权限
 
