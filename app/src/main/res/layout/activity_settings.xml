@@ -317,7 +317,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_margin="4dp"
-                        android:text="只删除本应用创建的备份与日志；此操作不可撤销。"
+                        android:text="会清除时间纠正与重复清理创建的备份和日志；此操作不可撤销。"
                         android:textAppearance="@style/SupportingText" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

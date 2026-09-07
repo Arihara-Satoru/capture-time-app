@@ -156,7 +156,7 @@ class SettingsActivity : Activity() {
         val sizeText = if (totalBytes >= 1024 * 1024) "%.1f MB".format(totalBytes / 1024.0 / 1024.0) else "%.1f KB".format(totalBytes / 1024.0)
         MaterialAlertDialogBuilder(this)
             .setTitle("清除备份？")
-            .setMessage("将永久删除 ${sessions.size} 个会话目录，约 $sizeText。\n\n其中包含照片原始备份和 TSV/JSON 日志。清除后无法使用这些备份恢复照片。\n\n只会删除名称以 capture-time-app- 开头的目录，不会删除 .temp 下其他内容。")
+            .setMessage("将永久删除 ${sessions.size} 个会话目录，约 $sizeText。\n\n其中包含时间纠正与重复清理的照片备份和 TSV/JSON 日志。清除后无法使用这些备份恢复照片。\n\n只会删除名称以 capture-time-app- 或 duplicate-cleanup- 开头的目录，不会删除 .temp 下其他内容。")
             .setNegativeButton("取消", null)
             .setPositiveButton("确认清除") { _, _ -> clearBackups(sessions) }
             .show()
@@ -172,7 +172,7 @@ class SettingsActivity : Activity() {
 
     private fun backupSessions(): List<File> = File(android.os.Environment.getExternalStorageDirectory(), ".temp")
         .listFiles()
-        ?.filter { it.isDirectory && it.name.startsWith("capture-time-app-") && it.name.length > "capture-time-app-".length }
+        ?.filter(BackupSessionRules::isManagedSession)
         ?.sortedByDescending { it.name }
         .orEmpty()
 
