@@ -63,14 +63,6 @@
                         android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="仅用于本机读取照片、原地修正和创建安全备份。"
-                        android:textAppearance="@style/SupportingText"
-                        android:textColor="?attr/colorOnPrimaryContainer" />
-
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/permissionButton"
                         style="@style/Widget.Material3.Button"
@@ -109,13 +101,6 @@
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="从已勾选且存在有效值的字段中选取。"
-                        android:textAppearance="@style/SupportingText" />
-
                     <Spinner
                         android:id="@+id/timeSelection"
                         android:layout_width="match_parent"
@@ -131,13 +116,6 @@
                         android:text="依据字段"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="用于计算应写入的时间。"
-                        android:textAppearance="@style/SupportingText" />
 
                     <CheckBox android:id="@+id/sourceCurrentCapture" style="@style/SettingsCheckBox" android:text="当前拍摄时间（优先 EXIF 原始）" />
                     <CheckBox android:id="@+id/sourceExifOriginal" style="@style/SettingsCheckBox" android:text="EXIF DateTimeOriginal（原始时间）" />
@@ -161,13 +139,6 @@
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="MediaStore 字段由 Android 管理，只读取和核验。"
-                        android:textAppearance="@style/SupportingText" />
-
                     <CheckBox android:id="@+id/destinationExifOriginal" style="@style/SettingsCheckBox" android:text="EXIF DateTimeOriginal（原始时间）" />
                     <CheckBox android:id="@+id/destinationExifDigitized" style="@style/SettingsCheckBox" android:text="EXIF DateTimeDigitized（数字化时间）" />
                     <CheckBox android:id="@+id/destinationExifModified" style="@style/SettingsCheckBox" android:text="EXIF DateTime（修改时间）" />
@@ -185,13 +156,6 @@
                         android:text="忽略误差"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="差值不超过误差时不修改；缺失字段仍会补写。"
-                        android:textAppearance="@style/SupportingText" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -317,7 +281,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_margin="4dp"
-                        android:text="会清除时间纠正与重复清理创建的备份和日志；此操作不可撤销。"
+                        android:text="此操作不可撤销。"
                         android:textAppearance="@style/SupportingText" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

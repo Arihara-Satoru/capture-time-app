@@ -71,7 +71,6 @@ class MainActivity : Activity() {
     private val scanProgress by lazy { findViewById<ProgressBar>(R.id.scanProgress) }
     private val scanSummary by lazy { findViewById<TextView>(R.id.scanSummary) }
     private val accessStatus by lazy { findViewById<TextView>(R.id.accessStatus) }
-    private val batchStatus by lazy { findViewById<TextView>(R.id.batchStatus) }
     private val resultText by lazy { findViewById<TextView>(R.id.resultText) }
     private val duplicateScanButton by lazy { findViewById<Button>(R.id.duplicateScanButton) }
     private val duplicateDeleteButton by lazy { findViewById<Button>(R.id.duplicateDeleteButton) }
@@ -144,7 +143,7 @@ class MainActivity : Activity() {
 
     private fun updatePermissionState() {
         val granted = hasStorageAccess()
-        accessStatus.text = if (granted) "权限已授予 · 仅在本机处理" else "需要照片与所有文件访问权限"
+        accessStatus.text = if (granted) "权限已授予" else "需要照片与所有文件访问权限"
         accessStatus.setTextColor(getColor(if (granted) R.color.permission_granted else R.color.permission_missing))
         scanButton.isEnabled = granted
         galleryButton.isEnabled = granted
@@ -347,8 +346,8 @@ class MainActivity : Activity() {
                     val bytes = scan.candidates.sumOf { it.delete.size }
                     duplicateSummary.text = "真实文件 ${scan.realFiles} · MediaStore 有效 ${scan.mediaFiles} · 候选 ${scan.candidates.size}"
                     duplicateResult.text = if (scan.candidates.isEmpty()) {
-                        "没有符合当前严格规则的可删项。视频仅在原名与六码副本的分辨率、时长和字节数完全一致时列出。"
-                    } else "默认已勾选全部候选，预计释放 ${formatBytes(bytes)}。可逐项取消；执行前还会重新核验并建立新备份会话。"
+                        "没有符合规则的重复项。"
+                    } else "候选 ${scan.candidates.size} 项，预计释放 ${formatBytes(bytes)}。"
                 }.onFailure { showDuplicateError("重复项扫描失败：${it.message}") }
             }
         }
@@ -471,14 +470,6 @@ class MainActivity : Activity() {
         val granted = hasStorageAccess()
         trialButton.isEnabled = granted && selected?.candidate == true && selected?.safeForTrial == true
         batchButton.isEnabled = granted && jpegTrialPassed && records.any { it.file.absolutePath !in completedPaths && it.candidate && it.safeForTrial && (it.format == ImageFormat.JPEG || it.format in unlockedFormats) }
-        batchStatus.text = when {
-            !granted -> "请先在设置中授予照片和所有文件访问权限"
-            selected == null -> "从候选列表选择一张照片后即可试运行"
-            selected?.safeForTrial != true -> "所选照片尚不满足安全试运行条件"
-            !jpegTrialPassed -> "已选择 ${selected?.file?.name}；需先完成一张 JPEG 试运行"
-            batchButton.isEnabled -> "JPEG 安全链路已通过，可批量确认"
-            else -> "当前没有可批量处理的候选"
-        }
     }
 
     private fun setBusy(busy: Boolean, message: String) {
