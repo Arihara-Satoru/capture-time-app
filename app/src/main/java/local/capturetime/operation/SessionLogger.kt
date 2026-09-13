@@ -24,10 +24,11 @@ class SessionLogger private constructor(val directory: File, records: List<Photo
 
     init {
         writeHeader(File(directory, "planned.tsv"), "original_path\tformat\tcurrent_capture_time\tcapture_source\tdate_added\tfilename_time\ttarget_capture_time\tcandidate\tsafe_for_trial\treason")
-        records.forEach { append(File(directory, "planned.tsv"), plannedRow(it)) }
+        appendRows(File(directory, "planned.tsv"), records.asSequence().map(::plannedRow))
         writeHeader(changed, "original_path\tbackup_path\told_capture_time\ttarget_capture_time\texif_verification\tmediastore_verification")
         writeHeader(skipped, "original_path\tformat\treason")
         writeHeader(restored, "original_path\tbackup_path\ttarget_capture_time\treason\texif_verification\tmediastore_verification\trestore_verification")
+        writeHeader(File(directory, "timings.tsv"), "original_path\tstage\telapsed_ms")
         updateSummary()
     }
 
@@ -35,6 +36,22 @@ class SessionLogger private constructor(val directory: File, records: List<Photo
         append(skipped, listOf(record.file.absolutePath, record.format.label, reason).joinToString("\t", transform = ::cell))
         skippedCount.incrementAndGet()
         updateSummary()
+    }
+
+    @Synchronized fun logUnselected(records: List<PhotoRecord>, selectedPaths: Set<String>) {
+        val unselected = records.filterNot { it.file.absolutePath in selectedPaths }
+        appendRows(skipped, unselected.asSequence().map {
+            listOf(it.file.absolutePath, it.format.label, if (it.candidate) "本次未纳入执行" else it.reason)
+                .joinToString("\t", transform = ::cell)
+        })
+        skippedCount.addAndGet(unselected.size)
+        updateSummary()
+    }
+
+    @Synchronized fun logTimings(record: PhotoRecord, timings: List<Pair<String, Long>>) {
+        appendRows(File(directory, "timings.tsv"), timings.asSequence().map { (stage, millis) ->
+            "${cell(record.file.absolutePath)}\t${cell(stage)}\t$millis"
+        })
     }
 
     @Synchronized fun logResult(result: ProcessResult) {
@@ -82,9 +99,13 @@ class SessionLogger private constructor(val directory: File, records: List<Photo
     private fun writeHeader(file: File, value: String) = file.writeText("$value\n", Charsets.UTF_8)
 
     private fun append(file: File, row: String) {
+        appendRows(file, sequenceOf(row))
+    }
+
+    private fun appendRows(file: File, rows: Sequence<String>) {
         FileOutputStream(file, true).use { stream ->
-            OutputStreamWriter(stream, Charsets.UTF_8).use { writer ->
-                writer.append(row).append('\n')
+            OutputStreamWriter(stream, Charsets.UTF_8).buffered(64 * 1024).use { writer ->
+                rows.forEach { writer.append(it).append('\n') }
                 writer.flush()
                 stream.fd.sync()
             }

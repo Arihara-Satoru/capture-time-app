@@ -12,9 +12,6 @@ import local.capturetime.settings.TimeField
 import local.capturetime.settings.TimeRuleConfig
 import local.capturetime.time.CaptureTimeParser
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -24,7 +21,28 @@ class SafePhotoProcessor(
     private val mediaStore: MediaStoreGateway,
     private val rule: TimeRuleConfig = TimeRuleConfig()
 ) {
-    fun process(record: PhotoRecord, session: SessionLogger): ProcessResult {
+    fun process(record: PhotoRecord, session: SessionLogger, onStage: (String) -> Unit = {}): ProcessResult {
+        val timings = mutableListOf<Pair<String, Long>>()
+        var stage = "写入前校验"
+        var started = System.nanoTime()
+        fun nextStage(next: String) {
+            val now = System.nanoTime()
+            timings += stage to TimeUnit.NANOSECONDS.toMillis(now - started)
+            stage = next
+            started = now
+            onStage(next)
+        }
+        onStage(stage)
+        return try {
+            processInternal(record, session, ::nextStage)
+        } finally {
+            timings += stage to TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+            // Diagnostic logging must not turn a completed write into an unreported failure.
+            runCatching { session.logTimings(record, timings) }
+        }
+    }
+
+    private fun processInternal(record: PhotoRecord, session: SessionLogger, onStage: (String) -> Unit): ProcessResult {
         val target = record.targetCaptureTime
             ?: return failure(record, "目标时间缺失")
         if (!Environment.isExternalStorageManager()) return failure(record, "所有文件访问权限已撤销")
@@ -36,7 +54,6 @@ class SafePhotoProcessor(
         val relative = PathPolicy.relativeStoragePath(record.file, storage)
             ?: return failure(record, "原路径不在共享存储内")
         val backup = File(session.directory, relative)
-        val beforeHash: String
         val originalExif = runCatching { exif.readRaw(record.file) }.getOrNull()
         val originalMedia = runCatching { mediaStore.query(record.file) }.getOrNull()
             ?: return failure(record, "写入前 MediaStore 记录已消失")
@@ -57,25 +74,28 @@ class SafePhotoProcessor(
         var mediaVerification = "未执行"
 
         try {
+            onStage("备份与哈希校验")
             val parent = requireNotNull(backup.parentFile) { "备份目录无效" }
             require(parent.isDirectory || parent.mkdirs()) { "无法创建备份目录" }
             require(!backup.exists()) { "备份路径已存在，拒绝覆盖" }
-            copyAndSync(record.file, backup)
-            beforeHash = sha256(record.file)
-            require(record.file.length() == backup.length() && beforeHash == sha256(backup)) { "备份完整性校验失败" }
+            VerifiedPhotoBackup.copyAndVerify(record.file, backup)
 
             val exifFields = changedFields.filterTo(mutableSetOf()) { it != TimeField.FILE_MODIFIED }
-            if (exifFields.isNotEmpty()) exif.write(record.file, target, exifFields)
+            onStage("写入与核验 EXIF")
+            // saveAttributes can fail after starting to replace the original file.
             modified = true
+            if (exifFields.isNotEmpty()) exif.write(record.file, target, exifFields)
             exifVerification = if (exifFields.isEmpty() || exif.verify(record.file, target, exifFields)) "通过" else "失败"
             require(exifVerification == "通过") { "所选 EXIF 字段核验失败" }
 
             val expectedModified = if (TimeField.FILE_MODIFIED in changedFields) target.toEpochMilli() else originalModifiedMillis
             require(record.file.setLastModified(expectedModified)) { "无法设置文件修改时间" }
             require(kotlin.math.abs(record.file.lastModified() - expectedModified) < 1000) { "文件修改时间核验失败" }
+            onStage("系统媒体扫描")
             val scannedUri = scan(record.file)
             require(scannedUri != null) { "媒体扫描超时或失败" }
             val expectedMillis = if (TimeField.EXIF_ORIGINAL in changedFields) target.epochSecond * 1000 else originalMedia.dateTaken?.toEpochMilli()
+            onStage("MediaStore 时间核验")
             val verified = waitForMedia(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
             mediaVerification = if (verified) "通过（扫描回调 URI）" else mediaDiagnostic(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
             require(verified) { "MediaStore DATE_TAKEN 或 DATE_ADDED 核验失败" }
@@ -83,7 +103,8 @@ class SafePhotoProcessor(
             return ProcessResult(record, true, false, false, "成功", backup.absolutePath, exifVerification, mediaVerification, "无需恢复")
         } catch (error: Exception) {
             if (!modified) return failure(record, error.message ?: "备份阶段失败", backup.takeIf { it.exists() }?.absolutePath, true)
-            val restore = restore(record.file, backup, originalExif, originalMedia?.dateTaken?.toEpochMilli(), originalMedia?.rawDateAddedSeconds, originalModifiedMillis)
+            onStage("失败恢复")
+            val restore = restore(record.file, backup, originalExif, originalMedia.dateTaken?.toEpochMilli(), originalMedia.rawDateAddedSeconds, originalModifiedMillis)
             return ProcessResult(
                 record, false, true, true, error.message ?: "处理失败", backup.absolutePath,
                 exifVerification, mediaVerification, restore
@@ -94,8 +115,7 @@ class SafePhotoProcessor(
     private fun restore(file: File, backup: File, originalExif: local.capturetime.exif.ExifTimes?, oldTaken: Long?, oldAdded: Long?, oldModifiedMillis: Long): String {
         if (!backup.isFile) return "失败：备份不存在"
         return try {
-            copyAndSync(backup, file)
-            require(file.length() == backup.length() && sha256(file) == sha256(backup)) { "恢复内容哈希不一致" }
+            VerifiedPhotoBackup.copyAndVerify(backup, file)
             require(file.setLastModified(oldModifiedMillis)) { "无法恢复原文件修改时间" }
             val scannedUri = scan(file)
             require(scannedUri != null) { "恢复后的媒体扫描失败" }
@@ -135,28 +155,6 @@ class SafePhotoProcessor(
             latch.countDown()
         }
         return if (latch.await(15, TimeUnit.SECONDS)) result else null
-    }
-
-    private fun copyAndSync(source: File, destination: File) {
-        FileInputStream(source).use { input ->
-            FileOutputStream(destination, false).use { output ->
-                input.copyTo(output)
-                output.fd.sync()
-            }
-        }
-    }
-
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        FileInputStream(file).use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun failure(record: PhotoRecord, reason: String, backup: String? = null, isFailure: Boolean = false) =

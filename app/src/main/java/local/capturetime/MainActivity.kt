@@ -268,10 +268,24 @@ class MainActivity : Activity() {
         setBusy(true, if (trial) "正在执行单张安全链路..." else "正在逐张执行批量安全链路...")
         executor.execute {
             val outcome = runCatching {
+                val started = android.os.SystemClock.elapsedRealtime()
+                runOnUiThread { processingDialog?.setMessage("正在批量写入执行计划与跳过清单…") }
                 val session = SessionLogger.create(Environment.getExternalStorageDirectory(), records)
                 val paths = selectedRecords.mapTo(hashSetOf()) { it.file.absolutePath }
-                records.filterNot { it.file.absolutePath in paths }.forEach { session.logSkipped(it, if (it.candidate) "本次未纳入执行" else it.reason) }
-                val results = selectedRecords.map { processor.process(it, session).also(session::logResult) }
+                session.logUnselected(records, paths)
+                var successCount = 0
+                val results = selectedRecords.mapIndexed { index, record ->
+                    val result = processor.process(record, session) { stage ->
+                        val seconds = (android.os.SystemClock.elapsedRealtime() - started) / 1000
+                        val successes = successCount
+                        runOnUiThread {
+                            processingDialog?.setMessage("已完成 $index / ${selectedRecords.size} · 成功 $successes\n已用时 ${seconds / 60} 分 ${seconds % 60} 秒\n${record.file.name}\n当前阶段：$stage")
+                        }
+                    }
+                    session.logResult(result)
+                    if (result.success) successCount++
+                    result
+                }
                 session to results
             }
             runOnUiThread {
