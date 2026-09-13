@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaScannerConnection
 import android.os.Environment
 import local.capturetime.exif.ExifGateway
+import local.capturetime.exif.JpegStructure
 import local.capturetime.media.MediaStoreGateway
 import local.capturetime.model.PhotoRecord
 import local.capturetime.model.ProcessResult
@@ -74,13 +75,17 @@ class SafePhotoProcessor(
         var mediaVerification = "未执行"
 
         try {
+            val exifFields = changedFields.filterTo(mutableSetOf()) { it != TimeField.FILE_MODIFIED }
+            if (exifFields.isNotEmpty()) {
+                onStage("JPEG 结构检查")
+                JpegStructure.validate(record.file)
+            }
             onStage("备份与哈希校验")
             val parent = requireNotNull(backup.parentFile) { "备份目录无效" }
             require(parent.isDirectory || parent.mkdirs()) { "无法创建备份目录" }
             require(!backup.exists()) { "备份路径已存在，拒绝覆盖" }
             VerifiedPhotoBackup.copyAndVerify(record.file, backup)
 
-            val exifFields = changedFields.filterTo(mutableSetOf()) { it != TimeField.FILE_MODIFIED }
             onStage("写入与核验 EXIF")
             // saveAttributes can fail after starting to replace the original file.
             modified = true

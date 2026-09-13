@@ -32,6 +32,7 @@ class ExifGateway {
     }
 
     fun write(file: File, target: Instant, fields: Set<TimeField>) {
+        JpegStructure.validate(file)
         val value = CaptureTimeParser.formatExif(target)
         val offset = CaptureTimeParser.formatExifOffset(target)
         ExifInterface(file).apply {
