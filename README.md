@@ -4,7 +4,9 @@
 
 应用不联网、不上传数据、不改文件名、不自动删除照片、不直接更新 MediaStore `DATE_TAKEN` 或 `DATE_ADDED`，也不访问小米图库的私有数据库或接口。只有用户在“照片重复纠正”页面明确勾选并确认后，应用才会按安全链路删除候选副本。Manifest 未声明 `INTERNET` 权限。
 
-## 当前版本：v1.3.3
+## 当前版本：v1.3.4
+
+- 修复仅修改文件修改时间或其他 EXIF 字段时，媒体扫描将旧数据库拍摄时间刷新为已有 EXIF 原始时间，却被误判为失败并等待 15 秒后恢复的问题。现在从写入后的文件重读 EXIF 原始时间计算扫描核验预期。
 
 - 明亮克制的 Material 3 界面，并完整适配系统深色模式；首页会明确展示本机处理与权限状态。
 - 照片候选和重复项列表使用虚拟化列表，重点信息、选中状态和安全执行入口保持清晰可见。
@@ -134,7 +136,7 @@ DateTimeDigitized
 DateTime
 ```
 
-写入值格式为 `yyyy:MM:dd HH:mm:ss`。应用不解码、重编码或压缩像素。写入后立即重读所选标签并核验所选文件修改时间，再调用公开的 `MediaScannerConnection.scanFile()`。MediaStore 最多等待 15 秒；修改 `DateTimeOriginal` 时要求 `DATE_TAKEN` 精确等于目标整秒，否则要求它保持原值；操作前后的 `DATE_ADDED` 秒值始终必须完全一致。
+写入值格式为 `yyyy:MM:dd HH:mm:ss`。应用不解码、重编码或压缩像素。写入后立即重读所选标签并核验所选文件修改时间，再调用公开的 `MediaScannerConnection.scanFile()`。MediaStore 最多等待 15 秒；要求 `DATE_TAKEN` 精确等于扫描前重读的有效 `DateTimeOriginal`，无论该字段本次是否修改；没有可解析的 EXIF 原始时间时回退到原 MediaStore 拍摄时间（原值也缺失时不核验该列）；操作前后的 `DATE_ADDED` 秒值始终必须完全一致。
 
 缺少可查询 `DATE_ADDED` 的文件会跳过，因为应用无法安全证明添加时间未变化。应用从不直接更新 MediaStore 时间列。
 

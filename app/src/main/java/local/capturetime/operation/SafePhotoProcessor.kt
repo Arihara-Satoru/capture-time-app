@@ -91,10 +91,12 @@ class SafePhotoProcessor(
             val expectedModified = if (TimeField.FILE_MODIFIED in changedFields) target.toEpochMilli() else originalModifiedMillis
             require(record.file.setLastModified(expectedModified)) { "无法设置文件修改时间" }
             require(kotlin.math.abs(record.file.lastModified() - expectedModified) < 1000) { "文件修改时间核验失败" }
+            val expectedMillis = MediaScanExpectation.dateTaken(
+                exif.readRaw(record.file).original, originalMedia.dateTaken?.toEpochMilli()
+            )
             onStage("系统媒体扫描")
             val scannedUri = scan(record.file)
             require(scannedUri != null) { "媒体扫描超时或失败" }
-            val expectedMillis = if (TimeField.EXIF_ORIGINAL in changedFields) target.epochSecond * 1000 else originalMedia.dateTaken?.toEpochMilli()
             onStage("MediaStore 时间核验")
             val verified = waitForMedia(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
             mediaVerification = if (verified) "通过（扫描回调 URI）" else mediaDiagnostic(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
