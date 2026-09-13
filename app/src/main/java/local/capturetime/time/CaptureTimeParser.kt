@@ -25,7 +25,18 @@ object CaptureTimeParser {
     private val earliestFilenameTime = Instant.parse("2000-01-01T00:00:00Z")
     private val latestFilenameTime = Instant.parse("2100-01-01T00:00:00Z")
 
-    fun parseExif(value: String?): Instant? = parseLocal(value, exifFormatter)
+    fun parseExif(value: String?, offset: String? = null): Instant? {
+        if (offset.isNullOrBlank()) return parseLocal(value, exifFormatter)
+        if (value.isNullOrBlank() || !Regex("[+-]\\d{2}:\\d{2}").matches(offset.trim())) return null
+        return try {
+            LocalDateTime.parse(value.trim(), exifFormatter)
+                .toInstant(java.time.ZoneOffset.of(offset.trim()))
+        } catch (_: DateTimeException) {
+            null
+        }
+    }
+
+    fun formatExifOffset(value: Instant): String = value.atZone(zone).offset.id
 
     fun parseFilename(filenameWithoutExtension: String): Instant? {
         return parsedFilenameTimes(filenameWithoutExtension).singleOrNull()

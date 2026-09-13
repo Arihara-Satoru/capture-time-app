@@ -62,7 +62,7 @@ class PhotoScanner(
         if (format == ImageFormat.OTHER) return skipped(file, format, "扩展名与文件签名不匹配或格式不支持")
 
         val rawExif = runCatching { exif.readRaw(file) }.getOrNull()
-        val exifTime = CaptureTimeParser.parseExif(rawExif?.original)
+        val exifTime = CaptureTimeParser.parseExif(rawExif?.original, rawExif?.originalOffset)
         val media = indexedMedia
         if (media?.rawDateAddedSeconds == null) {
             return skipped(file, format, "缺少可核验的 MediaStore DATE_ADDED，无法证明添加时间不变", exifTime, media)

@@ -9,6 +9,6 @@ internal object MediaScanExpectation {
         } else actualMillis == expectedMillis)
 
     // A rescan can replace a stale database value even when DateTimeOriginal was not edited.
-    fun dateTaken(actualExifOriginal: String?, previousTakenMillis: Long?): Long? =
-        CaptureTimeParser.parseExif(actualExifOriginal)?.toEpochMilli() ?: previousTakenMillis
+    fun dateTaken(actualExifOriginal: String?, previousTakenMillis: Long?, originalOffset: String? = null): Long? =
+        CaptureTimeParser.parseExif(actualExifOriginal, originalOffset)?.toEpochMilli() ?: previousTakenMillis
 }

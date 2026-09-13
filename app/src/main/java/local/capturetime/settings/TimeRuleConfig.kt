@@ -46,12 +46,12 @@ data class TimeRuleConfig(
         filenameTime: Instant?,
         fileModified: Instant
     ): Map<TimeField, Instant?> {
-        val original = CaptureTimeParser.parseExif(exif?.original)
+        val original = CaptureTimeParser.parseExif(exif?.original, exif?.originalOffset)
         return mapOf(
             TimeField.CURRENT_CAPTURE to (original ?: media?.dateTaken),
             TimeField.EXIF_ORIGINAL to original,
-            TimeField.EXIF_DIGITIZED to CaptureTimeParser.parseExif(exif?.digitized),
-            TimeField.EXIF_MODIFIED to CaptureTimeParser.parseExif(exif?.modified),
+            TimeField.EXIF_DIGITIZED to CaptureTimeParser.parseExif(exif?.digitized, exif?.digitizedOffset),
+            TimeField.EXIF_MODIFIED to CaptureTimeParser.parseExif(exif?.modified, exif?.modifiedOffset),
             TimeField.MEDIA_DATE_TAKEN to media?.dateTaken,
             TimeField.MEDIA_DATE_ADDED to media?.dateAdded,
             TimeField.FILENAME to filenameTime,
