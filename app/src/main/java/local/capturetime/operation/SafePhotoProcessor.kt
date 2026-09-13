@@ -91,14 +91,16 @@ class SafePhotoProcessor(
             val expectedModified = if (TimeField.FILE_MODIFIED in changedFields) target.toEpochMilli() else originalModifiedMillis
             require(record.file.setLastModified(expectedModified)) { "无法设置文件修改时间" }
             require(kotlin.math.abs(record.file.lastModified() - expectedModified) < 1000) { "文件修改时间核验失败" }
+            val actualOriginal = exif.readRaw(record.file).original
             val expectedMillis = MediaScanExpectation.dateTaken(
-                exif.readRaw(record.file).original, originalMedia.dateTaken?.toEpochMilli()
+                actualOriginal, originalMedia.dateTaken?.toEpochMilli()
             )
             onStage("系统媒体扫描")
             val scannedUri = scan(record.file)
             require(scannedUri != null) { "媒体扫描超时或失败" }
             onStage("MediaStore 时间核验")
-            val verified = waitForMedia(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
+            val verified = waitForMedia(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds,
+                secondPrecision = CaptureTimeParser.parseExif(actualOriginal) != null)
             mediaVerification = if (verified) "通过（扫描回调 URI）" else mediaDiagnostic(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
             require(verified) { "MediaStore DATE_TAKEN 或 DATE_ADDED 核验失败" }
 
@@ -130,17 +132,14 @@ class SafePhotoProcessor(
         }
     }
 
-    private fun waitForMedia(file: File, scanUri: android.net.Uri?, expectedTaken: Long?, expectedAdded: Long?): Boolean {
-        repeat(30) {
+    private fun waitForMedia(file: File, scanUri: android.net.Uri?, expectedTaken: Long?, expectedAdded: Long?, secondPrecision: Boolean = false): Boolean =
+        MediaWait.until(android.os.SystemClock::elapsedRealtime, Thread::sleep) {
             val current = runCatching { scanUri?.let { mediaStore.query(it, file) } }.getOrNull()
                 ?: runCatching { mediaStore.query(file) }.getOrNull()
-            val takenOk = expectedTaken == null || current?.dateTaken?.toEpochMilli() == expectedTaken
+            val takenOk = MediaScanExpectation.matchesTaken(current?.dateTaken?.toEpochMilli(), expectedTaken, secondPrecision)
             val addedOk = expectedAdded == null || current?.rawDateAddedSeconds == expectedAdded
-            if (current != null && takenOk && addedOk) return true
-            Thread.sleep(500)
+            current != null && takenOk && addedOk
         }
-        return false
-    }
 
     private fun mediaDiagnostic(file: File, scanUri: android.net.Uri?, expectedTaken: Long?, expectedAdded: Long?): String {
         val actual = runCatching { scanUri?.let { mediaStore.query(it, file) } }.getOrNull()
@@ -156,7 +155,7 @@ class SafePhotoProcessor(
             result = uri
             latch.countDown()
         }
-        return if (latch.await(15, TimeUnit.SECONDS)) result else null
+        return if (latch.await(MediaWait.TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) result else null
     }
 
     private fun failure(record: PhotoRecord, reason: String, backup: String? = null, isFailure: Boolean = false) =

@@ -5,6 +5,18 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class MediaScanExpectationTest {
+    @Test fun acceptsSubsecondsOnlyWithinTheExpectedSecond() {
+        org.junit.Assert.assertTrue(MediaScanExpectation.matchesTaken(1529296843992L, 1529296843000L, true))
+        org.junit.Assert.assertFalse(MediaScanExpectation.matchesTaken(1529296844000L, 1529296843000L, true))
+        org.junit.Assert.assertFalse(MediaScanExpectation.matchesTaken(1529296842999L, 1529296843000L, true))
+        org.junit.Assert.assertFalse(MediaScanExpectation.matchesTaken(null, 1529296843000L, true))
+    }
+
+    @Test fun restorationAndDatabaseFallbackStillRequireExactMilliseconds() {
+        org.junit.Assert.assertFalse(MediaScanExpectation.matchesTaken(1529296843992L, 1529296843000L, false))
+        org.junit.Assert.assertTrue(MediaScanExpectation.matchesTaken(1529296843992L, 1529296843992L, false))
+    }
+
     @Test fun fileModifiedOnlyUsesExistingExifInsteadOfStaleDatabaseTime() {
         assertEquals(1661432354000L, MediaScanExpectation.dateTaken("2022:08:25 20:59:14", 1762863324000L))
     }
