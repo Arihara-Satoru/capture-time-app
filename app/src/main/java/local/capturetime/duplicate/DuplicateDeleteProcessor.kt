@@ -5,6 +5,7 @@ import android.media.MediaScannerConnection
 import android.os.Environment
 import local.capturetime.media.MediaStoreGateway
 import local.capturetime.security.PathPolicy
+import local.capturetime.operation.MediaWait
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -26,18 +27,25 @@ class DuplicateDeleteProcessor(
         writeLine(log, "original_path\tretained_path\tbackup_path")
         val failures = mutableListOf<String>()
         var deleted = 0
+        var verified = 0
 
         candidates.forEach { candidate ->
-            val error = runCatching { deleteOne(candidate, storage, session, log) }.exceptionOrNull()
-            if (error == null) deleted++ else failures += "${candidate.delete.file.absolutePath}：${error.message ?: "处理失败"}"
+            var removed = false
+            val error = runCatching {
+                deleteOne(candidate, storage, session, log) { removed = true; deleted++ }
+            }.exceptionOrNull()
+            if (error == null) verified++ else failures +=
+                "${candidate.delete.file.absolutePath}：${if (removed) "已执行删除，后续核验或日志失败" else "未执行删除"}：${error.message ?: "处理失败"}"
         }
 
-        val rows = log.readLines(Charsets.UTF_8).drop(1).count { it.isNotBlank() }
-        if (rows != deleted) failures += "deleted.tsv 清单行数核验失败：记录 $rows，成功 $deleted"
-        return DuplicateDeleteResult(session, deleted, candidates.size - deleted, failures)
+        runCatching {
+            val rows = log.readLines(Charsets.UTF_8).drop(1).count { it.isNotBlank() }
+            require(rows == deleted) { "记录 $rows，已执行删除 $deleted" }
+        }.onFailure { failures += "deleted.tsv 清单行数核验失败：${it.message}" }
+        return DuplicateDeleteResult(session, deleted, candidates.size - deleted, failures, verified)
     }
 
-    private fun deleteOne(candidate: DuplicateCandidate, storage: File, session: File, log: File) {
+    private fun deleteOne(candidate: DuplicateCandidate, storage: File, session: File, log: File, onDeleted: () -> Unit) {
         val target = candidate.delete.file
         val retained = candidate.retained.file
         require(PathPolicy.isSafeFile(target, listOf(storage))) { "待删除路径不安全或文件已不存在" }
@@ -54,11 +62,17 @@ class DuplicateDeleteProcessor(
         require(FileVerification.contentEquals(target, backup)) { "备份与原件逐字节 cmp 核验失败" }
         require(FileVerification.sha256(backup) == candidate.delete.sha256) { "备份 SHA-256 核验失败" }
         require(target.delete()) { "删除原件失败" }
+        onDeleted()
+        // ponytail: record the completed deletion before fallible verification; a crash between unlink and logging still requires checking the backup.
+        writeLine(log, listOf(target.absolutePath, retained.absolutePath, backup.absolutePath).joinToString("\t", transform = ::cell))
         scanDeleted(target)
-        require(!target.exists()) { "删除后原路径仍存在" }
+        require(MediaWait.until(android.os.SystemClock::elapsedRealtime, Thread::sleep) {
+            require(!target.exists()) { "删除后原路径重新出现，请检查相册同步或其他应用；未再次删除" }
+            !mediaStore.containsDuplicatePath(target, candidate.delete.kind)
+        }) { "原文件已删除，但系统媒体库记录仍存在，请稍后重新扫描" }
+        require(!target.exists()) { "媒体库核验后原路径重新出现，请检查相册同步或其他应用；未再次删除" }
         require(retained.isFile) { "删除后保留文件不存在" }
         require(backup.isFile) { "删除后备份文件不存在" }
-        writeLine(log, listOf(target.absolutePath, retained.absolutePath, backup.absolutePath).joinToString("\t", transform = ::cell))
     }
 
     private fun verifyUnchanged(asset: DuplicateAsset) {
@@ -81,7 +95,7 @@ class DuplicateDeleteProcessor(
     private fun scanDeleted(file: File) {
         val latch = CountDownLatch(1)
         MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null) { _, _ -> latch.countDown() }
-        latch.await(15, TimeUnit.SECONDS)
+        require(latch.await(MediaWait.TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) { "原文件已删除，但系统媒体扫描超时，尚未确认媒体库清理" }
     }
 
     @Synchronized private fun writeLine(file: File, value: String) {

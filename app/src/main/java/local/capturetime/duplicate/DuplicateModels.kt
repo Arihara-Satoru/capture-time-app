@@ -32,7 +32,8 @@ data class DuplicateDeleteResult(
     val sessionDirectory: File,
     val deleted: Int,
     val skipped: Int,
-    val failures: List<String>
+    val failures: List<String>,
+    val verified: Int
 )
 
 data class MediaDetails(

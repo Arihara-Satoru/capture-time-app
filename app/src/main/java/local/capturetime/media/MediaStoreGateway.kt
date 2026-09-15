@@ -129,6 +129,16 @@ class MediaStoreGateway(private val context: Context) {
         return result[file.absolutePath.lowercase()]
     }
 
+    fun containsDuplicatePath(file: File, kind: MediaKind): Boolean {
+        val uri = if (kind == MediaKind.IMAGE) MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        else MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        // Do not filter on dimensions: even an incomplete row means cleanup is unconfirmed.
+        val cursor = context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID),
+            "${MediaStore.MediaColumns.DATA} = ?", arrayOf(file.absolutePath), null)
+            ?: error("无法查询系统媒体库，尚未确认清理结果")
+        return cursor.use { it.moveToFirst() }
+    }
+
     private fun queryDetails(uri: Uri, kind: MediaKind, paths: Set<String>, result: MutableMap<String, MediaDetails>) {
         val projection = mutableListOf(
             MediaStore.MediaColumns.DATA,

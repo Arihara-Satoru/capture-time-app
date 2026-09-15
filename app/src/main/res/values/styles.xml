@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">#146B5D</item>
+        <item name="colorPrimary">#1E3A5F</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#C8F0E3</item>
-        <item name="colorOnPrimaryContainer">#002019</item>
-        <item name="colorSecondary">#40645C</item>
+        <item name="colorPrimaryContainer">#DCE8F7</item>
+        <item name="colorOnPrimaryContainer">#102A43</item>
+        <item name="colorSecondary">#334155</item>
         <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="colorSecondaryContainer">#D9ECE5</item>
+        <item name="colorSecondaryContainer">#E2E8F0</item>
         <item name="colorOnSecondaryContainer">#0C211B</item>
         <item name="colorTertiary">#365F78</item>
         <item name="colorOnTertiary">#FFFFFF</item>
@@ -17,16 +17,17 @@
         <item name="colorOnError">#FFFFFF</item>
         <item name="colorErrorContainer">#FFDAD6</item>
         <item name="colorOnErrorContainer">#410002</item>
-        <item name="colorSurface">#F8FBF9</item>
-        <item name="colorOnSurface">#191C1A</item>
-        <item name="colorSurfaceVariant">#DDE5E0</item>
-        <item name="colorOnSurfaceVariant">#414944</item>
-        <item name="colorSurfaceContainer">#EDF1EE</item>
-        <item name="colorSurfaceContainerHigh">#E7ECE8</item>
-        <item name="colorOutline">#717A74</item>
-        <item name="colorOutlineVariant">#C1C9C4</item>
+        <item name="colorSurface">#F8FAFC</item>
+        <item name="colorOnSurface">#172033</item>
+        <item name="colorSurfaceVariant">#E2E8F0</item>
+        <item name="colorOnSurfaceVariant">#526176</item>
+        <item name="colorSurfaceContainer">#F1F5F9</item>
+        <item name="colorSurfaceContainerHigh">#E8EEF5</item>
+        <item name="colorOutline">#74839A</item>
+        <item name="colorOutlineVariant">#CBD5E1</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorBackground">#F8FBF9</item>
+        <item name="android:colorBackground">#F8FAFC</item>
+        <item name="android:windowActionModeOverlay">true</item>
         <item name="android:navigationBarColor">?attr/colorSurface</item>
         <item name="android:statusBarColor">?attr/colorSurface</item>
         <item name="android:windowLightStatusBar">true</item>
@@ -38,12 +39,13 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">22sp</item>
+        <item name="android:textSize">20sp</item>
     </style>
 
     <style name="SupportingText" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
         <item name="android:textSize">14sp</item>
+        <item name="android:lineSpacingExtra">3dp</item>
     </style>
 
     <style name="SettingsCheckBox" parent="Widget.Material3.CompoundButton.CheckBox">

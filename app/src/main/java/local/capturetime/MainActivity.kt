@@ -114,7 +114,7 @@ class MainActivity : Activity() {
             findViewById<View>(R.id.captureTimePage).visibility = if (captureSelected) View.VISIBLE else View.GONE
             findViewById<View>(R.id.duplicatePhotoPage).visibility = if (captureSelected) View.GONE else View.VISIBLE
             findViewById<MaterialToolbar>(R.id.mainToolbar).title =
-                if (captureSelected) "拍摄时间纠正" else "照片重复纠正"
+                 if (captureSelected) "拍摄时间" else "重复照片"
             true
         }
         findViewById<BottomNavigationView>(R.id.bottomNavigation).selectedItemId = R.id.navigationCaptureTime
@@ -382,6 +382,9 @@ class MainActivity : Activity() {
     private fun deleteDuplicates(candidates: List<DuplicateCandidate>) {
         if (!ensurePermission()) return
         setDuplicateBusy(true, "正在逐项复核、备份并删除...")
+        duplicateCandidates = emptyList()
+        duplicateAdapter.submitList(emptyList())
+        duplicateSummary.text = "清理后需重新扫描确认剩余候选"
         executor.execute {
             val result = runCatching { duplicateProcessor.delete(candidates) }
             val rescan = result.getOrNull()?.let { runCatching { duplicateScanner.scan() } }
@@ -391,11 +394,13 @@ class MainActivity : Activity() {
                     rescan?.onSuccess { scan ->
                         duplicateCandidates = scan.candidates
                         duplicateAdapter.submitList(scan.candidates)
-                        duplicateSummary.text = "复扫后候选 ${scan.candidates.size} · 本批删除 ${outcome.deleted} · 跳过 ${outcome.skipped}"
+                        duplicateSummary.text = "复扫后候选 ${scan.candidates.size} · 已执行删除 ${outcome.deleted} · 核验通过 ${outcome.verified}"
                     }
                     duplicateResult.text = buildString {
-                        append("本批删除 ").append(outcome.deleted).append("，跳过 ").append(outcome.skipped).append("。\n会话：").append(outcome.sessionDirectory.absolutePath)
-                        append("\n日志：deleted.tsv；原路径、保留文件和备份均已逐项核验。")
+                        append("已执行删除 ").append(outcome.deleted).append("，核验通过 ").append(outcome.verified)
+                        append("，待确认 ").append(outcome.deleted - outcome.verified).append("，未删除 ").append(outcome.skipped)
+                        append("。\n会话：").append(outcome.sessionDirectory.absolutePath)
+                        append("\n日志：deleted.tsv 记录已执行的删除；核验通过表示检查时原路径与系统媒体记录均已消失，且保留文件和备份存在。后续云同步仍可能重新下载。")
                         if (outcome.failures.isNotEmpty()) append("\n\n").append(outcome.failures.joinToString("\n"))
                         rescan?.exceptionOrNull()?.let { append("\n\n删除完成，但剩余文件复扫失败：").append(it.message) }
                     }
