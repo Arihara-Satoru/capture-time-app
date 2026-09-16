@@ -3,6 +3,7 @@ package local.capturetime.operation
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.os.Environment
+import android.system.Os
 import local.capturetime.exif.ExifGateway
 import local.capturetime.exif.JpegStructure
 import local.capturetime.media.MediaStoreGateway
@@ -66,11 +67,12 @@ class SafePhotoProcessor(
         }
         val values = rule.values(originalExif, originalMedia, CaptureTimeParser.parseFilename(stem), java.time.Instant.ofEpochMilli(originalModifiedMillis))
         val recalculatedTarget = rule.selectTarget(values)
-        val changedFields = rule.destinationFields.filterTo(mutableSetOf()) { rule.needsChange(values[it], target) }
+        val changedFields = rule.fieldsNeedingChange(values, target, originalExif).toSet()
         if (recalculatedTarget != target || changedFields.isEmpty()) {
             return failure(record, "预览后时间状态已变化，已安全跳过")
         }
         var modified = false
+        var backupReceipt: VerifiedPhotoBackup.BackupReceipt? = null
         var exifVerification = "未执行"
         var mediaVerification = "未执行"
 
@@ -84,19 +86,26 @@ class SafePhotoProcessor(
             val parent = requireNotNull(backup.parentFile) { "备份目录无效" }
             require(parent.isDirectory || parent.mkdirs()) { "无法创建备份目录" }
             require(!backup.exists()) { "备份路径已存在，拒绝覆盖" }
-            VerifiedPhotoBackup.copyAndVerify(record.file, backup)
+            backupReceipt = VerifiedPhotoBackup.copyNewAndVerify(record.file, backup, session.directory)
 
             onStage("写入与核验 EXIF")
-            // saveAttributes can fail after starting to replace the original file.
-            modified = true
-            if (exifFields.isNotEmpty()) exif.write(record.file, target, exifFields)
-            exifVerification = if (exifFields.isEmpty() || exif.verify(record.file, target, exifFields)) "通过" else "失败"
-            require(exifVerification == "通过") { "所选 EXIF 字段核验失败" }
-
             val expectedModified = if (TimeField.FILE_MODIFIED in changedFields) target.toEpochMilli() else originalModifiedMillis
-            require(record.file.setLastModified(expectedModified)) { "无法设置文件修改时间" }
-            require(kotlin.math.abs(record.file.lastModified() - expectedModified) < 1000) { "文件修改时间核验失败" }
-            val actualExif = exif.readRaw(record.file)
+            val actualExif = VerifiedPhotoBackup.withVerifiedWritableFile(
+                record.file,
+                storage,
+                backupReceipt.sourceIdentity
+            ) { descriptor, descriptorFile ->
+                // saveAttributes can fail after starting to replace the original file.
+                modified = true
+                if (exifFields.isNotEmpty()) exif.write(descriptor, target, exifFields)
+                exifVerification = if (exifFields.isEmpty() || exif.verify(descriptor, target, exifFields)) "通过" else "失败"
+                require(exifVerification == "通过") { "所选 EXIF 字段核验失败" }
+                require(descriptorFile.setLastModified(expectedModified)) { "无法设置文件修改时间" }
+                val stat = Os.fstat(descriptor)
+                val modifiedMillis = stat.st_mtim.tv_sec * 1000 + stat.st_mtim.tv_nsec / 1_000_000
+                require(kotlin.math.abs(modifiedMillis - expectedModified) < 1000) { "文件修改时间核验失败" }
+                exif.readRaw(descriptor)
+            }
             val expectedMillis = MediaScanExpectation.dateTaken(
                 actualExif.original, originalMedia.dateTaken?.toEpochMilli(), actualExif.originalOffset
             )
@@ -108,12 +117,25 @@ class SafePhotoProcessor(
                 secondPrecision = CaptureTimeParser.parseExif(actualExif.original, actualExif.originalOffset) != null)
             mediaVerification = if (verified) "通过（扫描回调 URI）" else mediaDiagnostic(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
             require(verified) { "MediaStore DATE_TAKEN 或 DATE_ADDED 核验失败" }
+            require(VerifiedPhotoBackup.hasIdentity(record.file, storage, backupReceipt.sourceIdentity)) {
+                "写入后原路径文件身份已变化"
+            }
 
             return ProcessResult(record, true, false, false, "成功", backup.absolutePath, exifVerification, mediaVerification, "无需恢复")
         } catch (error: Exception) {
             if (!modified) return failure(record, error.message ?: "备份阶段失败", backup.takeIf { it.exists() }?.absolutePath, true)
             onStage("失败恢复")
-            val restore = restore(record.file, backup, originalExif, originalMedia.dateTaken?.toEpochMilli(), originalMedia.rawDateAddedSeconds, originalModifiedMillis)
+            val restore = restore(
+                record.file,
+                backup,
+                session.directory,
+                storage,
+                requireNotNull(backupReceipt),
+                originalExif,
+                originalMedia.dateTaken?.toEpochMilli(),
+                originalMedia.rawDateAddedSeconds,
+                originalModifiedMillis
+            )
             return ProcessResult(
                 record, false, true, true, error.message ?: "处理失败", backup.absolutePath,
                 exifVerification, mediaVerification, restore
@@ -121,16 +143,49 @@ class SafePhotoProcessor(
         }
     }
 
-    private fun restore(file: File, backup: File, originalExif: local.capturetime.exif.ExifTimes?, oldTaken: Long?, oldAdded: Long?, oldModifiedMillis: Long): String {
+    private fun restore(
+        file: File,
+        backup: File,
+        sessionRoot: File,
+        storageRoot: File,
+        backupReceipt: VerifiedPhotoBackup.BackupReceipt,
+        originalExif: local.capturetime.exif.ExifTimes?,
+        oldTaken: Long?,
+        oldAdded: Long?,
+        oldModifiedMillis: Long
+    ): String {
         if (!backup.isFile) return "失败：备份不存在"
         return try {
-            VerifiedPhotoBackup.copyAndVerify(backup, file)
-            require(file.setLastModified(oldModifiedMillis)) { "无法恢复原文件修改时间" }
+            require(VerifiedPhotoBackup.sha256Hex(
+                backup,
+                sessionRoot,
+                requireSingleLink = true
+            ) == backupReceipt.backupSha256) { "恢复前备份 SHA-256 已变化" }
+            VerifiedPhotoBackup.copyAndVerify(
+                backup,
+                file,
+                sessionRoot,
+                storageRoot,
+                backupReceipt.sourceIdentity
+            )
+            val raw = VerifiedPhotoBackup.withVerifiedWritableFile(
+                file,
+                storageRoot,
+                backupReceipt.sourceIdentity
+            ) { descriptor, descriptorFile ->
+                require(descriptorFile.setLastModified(oldModifiedMillis)) { "无法恢复原文件修改时间" }
+                val stat = Os.fstat(descriptor)
+                val modifiedMillis = stat.st_mtim.tv_sec * 1000 + stat.st_mtim.tv_nsec / 1_000_000
+                require(kotlin.math.abs(modifiedMillis - oldModifiedMillis) < 1000) { "恢复后的文件修改时间不一致" }
+                exif.readRaw(descriptor)
+            }
             val scannedUri = scan(file)
             require(scannedUri != null) { "恢复后的媒体扫描失败" }
-            val raw = exif.readRaw(file)
             require(originalExif == null || raw == originalExif) { "恢复后的 EXIF 不一致" }
             val mediaOk = waitForMedia(file, scannedUri, oldTaken, oldAdded)
+            require(VerifiedPhotoBackup.hasIdentity(file, storageRoot, backupReceipt.sourceIdentity)) {
+                "恢复后原路径文件身份已变化"
+            }
             if (mediaOk) "通过：文件、EXIF 与 MediaStore 已恢复" else "失败：文件及 EXIF 已恢复，但 MediaStore 恢复核验失败"
         } catch (error: Exception) {
             "失败：${error.message}"

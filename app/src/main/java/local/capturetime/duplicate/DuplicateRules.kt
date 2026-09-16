@@ -13,7 +13,6 @@ object DuplicateRules {
     fun findCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
         val result = linkedMapOf<String, DuplicateCandidate>()
         assets.groupBy { directoryKey(it) }.values.forEach { directory ->
-            findScreenshotCandidates(directory).forEach { result[it.delete.file.absolutePath] = it }
             findImageCandidates(directory.filter { it.kind == MediaKind.IMAGE }).forEach {
                 result.putIfAbsent(it.delete.file.absolutePath, it)
             }
@@ -24,18 +23,14 @@ object DuplicateRules {
         return result.values.sortedBy { it.delete.file.absolutePath.lowercase(Locale.ROOT) }
     }
 
-    private fun findScreenshotCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
-        return assets.asSequence()
-            .filter { it.kind == MediaKind.IMAGE && stem(it).startsWith("Screenshot_", ignoreCase = true) }
-            .groupBy { stem(it).lowercase(Locale.ROOT) }
-            .values
-            .flatMap { group ->
-                val png = group.filter { extension(it) == "png" }.maxByOrNull { it.size } ?: return@flatMap emptyList()
-                group.filter { extension(it) in setOf("jpg", "jpeg") }.map {
-                    DuplicateCandidate(it, png, "同名 Screenshot 保留 PNG，处理 JPG")
-                }
-            }
+    fun hasSelectionConflict(candidates: List<DuplicateCandidate>): Boolean {
+        val deletePaths = candidates.map { normalizePath(it.delete.file.absolutePath) }
+        if (deletePaths.toSet().size != deletePaths.size) return true
+        return candidates.any { normalizePath(it.retained.file.absolutePath) in deletePaths }
     }
+
+    fun hasMatchingContent(candidate: DuplicateCandidate): Boolean =
+        candidate.delete.sha256.isNotBlank() && candidate.delete.sha256 == candidate.retained.sha256
 
     private fun findImageCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
         return assets.groupBy { extension(it) }.values.flatMap { sameExtension ->
@@ -88,11 +83,13 @@ object DuplicateRules {
             }
         }
         group.groupBy { it.width to it.height }.values.forEach { sameResolution ->
-            val retained = sameResolution.maxByOrNull { it.size } ?: return@forEach
-            sameResolution.filter { it.size < retained.size }.forEach { smaller ->
+            val retained = sameResolution.maxWithOrNull(
+                compareBy<DuplicateAsset> { it.size }.thenBy { if (copyName(stem(it)) == null) 1 else 0 }
+            ) ?: return@forEach
+            sameResolution.filter { it !== retained && it.size <= retained.size }.forEach { smaller ->
                 candidates.putIfAbsent(
                     smaller.file.absolutePath,
-                    DuplicateCandidate(smaller, retained, "同扩展名、同分辨率，保留实际字节数更大的文件")
+                    DuplicateCandidate(smaller, retained, "同扩展名、同分辨率，最终仅保留 SHA-256 完全一致的副本")
                 )
             }
         }
@@ -104,7 +101,8 @@ object DuplicateRules {
         return assets.mapNotNull { copyAsset ->
             val match = safeVideoHexCopy.matchEntire(stem(copyAsset)) ?: return@mapNotNull null
             val original = byStemAndExtension[match.groupValues[1].lowercase(Locale.ROOT) to extension(copyAsset)] ?: return@mapNotNull null
-            if (copyAsset.width == original.width && copyAsset.height == original.height &&
+            if (copyAsset.durationMillis > 0 && original.durationMillis > 0 &&
+                copyAsset.width == original.width && copyAsset.height == original.height &&
                 copyAsset.durationMillis == original.durationMillis && copyAsset.size == original.size
             ) DuplicateCandidate(copyAsset, original, "视频分辨率、时长和实际字节数完全一致，保留无后缀原名") else null
         }

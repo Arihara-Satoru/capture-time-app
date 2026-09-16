@@ -40,6 +40,31 @@ data class TimeRuleConfig(
     fun needsChange(actual: Instant?, target: Instant): Boolean =
         actual == null || abs(actual.epochSecond - target.epochSecond) > toleranceSeconds
 
+    fun fieldsNeedingChange(
+        values: Map<TimeField, Instant?>,
+        target: Instant,
+        exif: ExifTimes?
+    ): List<TimeField> {
+        val currentCapture = values[TimeField.CURRENT_CAPTURE]
+        return destinationFields.filter { field ->
+            val actual = values[field]
+            when {
+                actual != null -> needsChange(actual, target)
+                !field.isMissingIn(exif) -> true
+                toleranceSeconds == 0L -> true
+                currentCapture == null -> true
+                else -> needsChange(currentCapture, target)
+            }
+        }
+    }
+
+    private fun TimeField.isMissingIn(exif: ExifTimes?): Boolean = exif != null && when (this) {
+        TimeField.EXIF_ORIGINAL -> exif.original.isNullOrBlank() && exif.originalOffset.isNullOrBlank()
+        TimeField.EXIF_DIGITIZED -> exif.digitized.isNullOrBlank() && exif.digitizedOffset.isNullOrBlank()
+        TimeField.EXIF_MODIFIED -> exif.modified.isNullOrBlank() && exif.modifiedOffset.isNullOrBlank()
+        else -> false
+    }
+
     fun values(
         exif: ExifTimes?,
         media: MediaSnapshot?,

@@ -16,6 +16,8 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import local.capturetime.BuildConfig
+import local.capturetime.duplicate.DuplicateDeleteProcessor
 import java.io.File
 
 class SettingsActivity : Activity() {
@@ -133,13 +135,15 @@ class SettingsActivity : Activity() {
             .putString("source_fields", sources.joinToString(",") { it.name })
             .putString("destination_fields", destinations.joinToString(",") { it.name })
             .apply()
+        File(filesDir, "last-scan.json").delete()
         Toast.makeText(this, "时间规则已保存，将刷新当前照片预览", Toast.LENGTH_LONG).show()
         finish()
     }
 
     private fun showLogs() {
         val temp = File(android.os.Environment.getExternalStorageDirectory(), ".temp")
-        val sessions = temp.listFiles()?.filter { it.isDirectory && it.name.startsWith("capture-time-app-") }?.sortedByDescending { it.name }.orEmpty()
+        val sessions = temp.listFiles()?.filter { BackupSessionRules.isCaptureSession(it, BuildConfig.DEBUG) }
+            ?.sortedByDescending { it.name }.orEmpty()
         val text = if (sessions.isEmpty()) "暂无会话日志" else sessions.joinToString("\n\n") { session ->
             "${session.name}\n${File(session, "summary.json").takeIf { it.isFile }?.readText().orEmpty()}"
         }
@@ -147,16 +151,20 @@ class SettingsActivity : Activity() {
     }
 
     private fun confirmClearBackups() {
+        if (DuplicateDeleteProcessor.isBackupCleanupBlocked(this)) {
+            Toast.makeText(this, "重复删除仍在准备、确认或核验，不能清除备份", Toast.LENGTH_LONG).show()
+            return
+        }
         val sessions = backupSessions()
         if (sessions.isEmpty()) {
             Toast.makeText(this, "没有找到可清除的备份", Toast.LENGTH_SHORT).show()
             return
         }
-        val totalBytes = sessions.sumOf { it.walkTopDown().filter(File::isFile).sumOf(File::length) }
+        val totalBytes = sessions.sumOf { BackupSessionRules.sessionSize(it, BuildConfig.DEBUG) }
         val sizeText = if (totalBytes >= 1024 * 1024) "%.1f MB".format(totalBytes / 1024.0 / 1024.0) else "%.1f KB".format(totalBytes / 1024.0)
         MaterialAlertDialogBuilder(this)
             .setTitle("清除备份？")
-            .setMessage("将永久删除 ${sessions.size} 个会话目录，约 $sizeText。\n\n其中包含时间纠正与重复清理的照片备份和 TSV/JSON 日志。清除后无法使用这些备份恢复照片。\n\n只会删除名称以 capture-time-app- 或 duplicate-cleanup- 开头的目录，不会删除 .temp 下其他内容。")
+            .setMessage("将永久删除 ${sessions.size} 个会话目录，约 $sizeText。\n\n其中包含时间纠正与重复清理的照片备份和 TSV/JSON 日志。清除后无法使用这些备份恢复照片。\n\n只会删除当前安装版本创建的 capture-time-app 或 duplicate-cleanup 会话，不会删除另一安装版本或 .temp 下其他内容。")
             .setNegativeButton("取消", null)
             .setPositiveButton("确认清除") { _, _ -> clearBackups(sessions) }
             .show()
@@ -165,14 +173,22 @@ class SettingsActivity : Activity() {
     private fun clearBackups(sessions: List<File>) {
         var removed = 0
         var failed = 0
-        sessions.forEach { if (it.deleteRecursively()) removed++ else failed++ }
+        val allowed = DuplicateDeleteProcessor.runBackupCleanupIfAllowed(this) {
+            sessions.forEach {
+                if (BackupSessionRules.deleteManagedSession(it, BuildConfig.DEBUG)) removed++ else failed++
+            }
+        }
+        if (!allowed) {
+            Toast.makeText(this, "重复删除状态已变化，未清除任何备份", Toast.LENGTH_LONG).show()
+            return
+        }
         val message = if (failed == 0) "已清除 $removed 个备份会话目录" else "已清除 $removed 个目录，$failed 个目录清除失败"
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     private fun backupSessions(): List<File> = File(android.os.Environment.getExternalStorageDirectory(), ".temp")
         .listFiles()
-        ?.filter(BackupSessionRules::isManagedSession)
+        ?.filter { BackupSessionRules.isManagedSession(it, BuildConfig.DEBUG) }
         ?.sortedByDescending { it.name }
         .orEmpty()
 

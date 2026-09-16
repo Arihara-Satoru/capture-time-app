@@ -68,6 +68,6 @@ class ScanSnapshotStore(context: Context) {
     private fun JSONObject.stringOrNull(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
 
     private companion object {
-        const val SNAPSHOT_VERSION = 2
+        const val SNAPSHOT_VERSION = 3
     }
 }

@@ -1,6 +1,8 @@
 package local.capturetime.exif
 
+import android.system.Os
 import java.io.File
+import java.io.FileDescriptor
 import java.io.IOException
 import java.io.RandomAccessFile
 
@@ -30,6 +32,37 @@ internal object JpegStructure {
                 }
                 input.seek(end)
             }
+        }
+    }
+
+    fun validate(descriptor: FileDescriptor) {
+        val size = Os.fstat(descriptor).st_size
+        var position = 0L
+        fun readByte(): Int {
+            val value = ByteArray(1)
+            if (Os.pread(descriptor, value, 0, 1, position) != 1) return -1
+            position++
+            return value[0].toInt() and 0xff
+        }
+        if (readByte() != 0xff || readByte() != 0xd8) return
+        while (true) {
+            if (readByte() != 0xff) invalid()
+            var marker = readByte()
+            while (marker == 0xff) marker = readByte()
+            if (marker < 0 || marker == 0 || marker == 0xd8 || marker == 0xd9 || marker in 0xd0..0xd7) invalid()
+            if (marker == 0x01) continue
+            val high = readByte()
+            val low = readByte()
+            if (high < 0 || low < 0) invalid()
+            val length = (high shl 8) or low
+            val end = position + length - 2
+            if (length < 2 || end > size) invalid()
+            if (marker == 0xda) {
+                val components = readByte()
+                if (components !in 1..4 || length != 6 + 2 * components || end >= size) invalid()
+                return
+            }
+            position = end
         }
     }
 

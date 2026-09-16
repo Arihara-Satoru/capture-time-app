@@ -4,6 +4,7 @@ import androidx.exifinterface.media.ExifInterface
 import local.capturetime.time.CaptureTimeParser
 import local.capturetime.settings.TimeField
 import java.io.File
+import java.io.FileDescriptor
 import java.time.Instant
 
 data class ExifTimes(
@@ -20,7 +21,14 @@ class ExifGateway {
     }
 
     fun readRaw(file: File): ExifTimes {
-        val exif = ExifInterface(file)
+        return readTimes(ExifInterface(file))
+    }
+
+    fun readRaw(descriptor: FileDescriptor): ExifTimes {
+        return readTimes(ExifInterface(descriptor))
+    }
+
+    private fun readTimes(exif: ExifInterface): ExifTimes {
         return ExifTimes(
             exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL),
             exif.getAttribute(ExifInterface.TAG_DATETIME_DIGITIZED),
@@ -33,9 +41,18 @@ class ExifGateway {
 
     fun write(file: File, target: Instant, fields: Set<TimeField>) {
         JpegStructure.validate(file)
+        writeAttributes(ExifInterface(file), target, fields)
+    }
+
+    fun write(descriptor: FileDescriptor, target: Instant, fields: Set<TimeField>) {
+        JpegStructure.validate(descriptor)
+        writeAttributes(ExifInterface(descriptor), target, fields)
+    }
+
+    private fun writeAttributes(exif: ExifInterface, target: Instant, fields: Set<TimeField>) {
         val value = CaptureTimeParser.formatExif(target)
         val offset = CaptureTimeParser.formatExifOffset(target)
-        ExifInterface(file).apply {
+        exif.apply {
             if (TimeField.EXIF_ORIGINAL in fields) {
                 setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, value)
                 setAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL, offset)
@@ -61,7 +78,14 @@ class ExifGateway {
     }
 
     fun verify(file: File, target: Instant, fields: Set<TimeField>): Boolean {
-        val actual = readRaw(file)
+        return verifyTimes(readRaw(file), target, fields)
+    }
+
+    fun verify(descriptor: FileDescriptor, target: Instant, fields: Set<TimeField>): Boolean {
+        return verifyTimes(readRaw(descriptor), target, fields)
+    }
+
+    private fun verifyTimes(actual: ExifTimes, target: Instant, fields: Set<TimeField>): Boolean {
         val expected = CaptureTimeParser.formatExif(target)
         val offset = CaptureTimeParser.formatExifOffset(target)
         return (TimeField.EXIF_ORIGINAL !in fields || (actual.original == expected && actual.originalOffset == offset)) &&

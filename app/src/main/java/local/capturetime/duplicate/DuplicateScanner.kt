@@ -30,7 +30,7 @@ class DuplicateScanner(private val mediaStore: MediaStoreGateway) {
                 delete = candidate.delete.withHash(hashCache),
                 retained = candidate.retained.withHash(hashCache)
             )
-        }
+        }.filter(DuplicateRules::hasMatchingContent)
         return DuplicateScanResult(realFiles.size, assets.size, hashedCandidates)
     }
 

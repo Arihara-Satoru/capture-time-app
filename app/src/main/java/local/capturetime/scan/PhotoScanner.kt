@@ -81,7 +81,7 @@ class PhotoScanner(
         val values = rule.values(rawExif, media, filenameTime, Instant.ofEpochMilli(file.lastModified()))
         val target = rule.selectTarget(values)
             ?: return skipped(file, format, "所选依据字段均缺少有效时间", exifTime, media, filenameTime)
-        val changedFields = rule.destinationFields.filter { field -> rule.needsChange(values[field], target) }
+        val changedFields = rule.fieldsNeedingChange(values, target, rawExif)
         val candidate = changedFields.isNotEmpty()
         val reason = when {
             !file.canWrite() -> "文件不可写"

@@ -1,7 +1,9 @@
 package local.capturetime.operation
 
+import local.capturetime.BuildConfig
 import local.capturetime.model.PhotoRecord
 import local.capturetime.model.ProcessResult
+import local.capturetime.settings.BackupSessionRules
 import local.capturetime.time.CaptureTimeParser
 import org.json.JSONObject
 import java.io.File
@@ -118,12 +120,13 @@ class SessionLogger private constructor(val directory: File, records: List<Photo
         private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
 
         fun create(storageRoot: File, records: List<PhotoRecord>): SessionLogger {
-            val temp = File(storageRoot, ".temp")
-            require(temp.isDirectory || (!temp.exists() && temp.mkdir())) { "无法创建 /sdcard/.temp" }
             repeat(3) {
-                val name = "capture-time-app-${formatter.format(ZonedDateTime.now(CaptureTimeParser.zone))}"
-                val directory = File(temp, name)
-                if (directory.mkdir()) return SessionLogger(directory, records)
+                val name = BackupSessionRules.captureSessionName(
+                    formatter.format(ZonedDateTime.now(CaptureTimeParser.zone)),
+                    BuildConfig.DEBUG
+                )
+                val directory = runCatching { BackupSessionRules.createSessionDirectory(storageRoot, name) }.getOrNull()
+                if (directory != null) return SessionLogger(directory, records)
                 Thread.sleep(1100)
             }
             error("无法创建唯一会话目录")

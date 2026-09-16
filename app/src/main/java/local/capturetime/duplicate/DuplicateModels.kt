@@ -1,5 +1,6 @@
 package local.capturetime.duplicate
 
+import android.net.Uri
 import java.io.File
 
 enum class MediaKind { IMAGE, VIDEO }
@@ -34,6 +35,27 @@ data class DuplicateDeleteResult(
     val skipped: Int,
     val failures: List<String>,
     val verified: Int
+)
+
+data class PreparedDuplicateDelete(
+    val delete: DuplicateAsset,
+    val retained: DuplicateAsset,
+    val backup: File,
+    val mediaUris: List<Uri>
+)
+
+enum class DuplicateDeleteConfirmation {
+    AWAITING_CONFIRMATION,
+    CONFIRMED,
+    UNKNOWN
+}
+
+data class DuplicateDeletePreparation(
+    val sessionDirectory: File,
+    val requested: Int,
+    val prepared: List<PreparedDuplicateDelete>,
+    val failures: List<String>,
+    val confirmation: DuplicateDeleteConfirmation = DuplicateDeleteConfirmation.AWAITING_CONFIRMATION
 )
 
 data class MediaDetails(

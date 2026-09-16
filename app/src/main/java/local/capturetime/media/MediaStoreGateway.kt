@@ -147,8 +147,7 @@ class MediaStoreGateway(private val context: Context) {
     }
 
     fun containsDuplicatePath(file: File, kind: MediaKind): Boolean {
-        val uri = if (kind == MediaKind.IMAGE) MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-        else MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        val uri = duplicateCollection(kind)
         // Do not filter on dimensions: even an incomplete row means cleanup is unconfirmed.
         val cursor = context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)
             ?: error("无法查询系统媒体库，尚未确认清理结果")
@@ -161,6 +160,56 @@ class MediaStoreGateway(private val context: Context) {
         }
     }
 
+    fun remainingDuplicatePaths(files: List<Pair<File, MediaKind>>): Set<Pair<String, MediaKind>> {
+        val requested = files.mapTo(linkedSetOf()) { (file, kind) -> pathKey(file) to kind }
+        if (requested.isEmpty()) return emptySet()
+        val result = linkedSetOf<Pair<String, MediaKind>>()
+        MediaKind.entries.forEach { kind ->
+            val wantedPaths = requested.asSequence().filter { it.second == kind }.mapTo(hashSetOf()) { it.first }
+            if (wantedPaths.isEmpty()) return@forEach
+            val cursor = context.contentResolver.query(
+                duplicateCollection(kind),
+                arrayOf(MediaStore.MediaColumns.DATA),
+                null,
+                null,
+                null
+            ) ?: error("无法查询系统媒体库，尚未确认清理结果")
+            cursor.use { rows ->
+                while (rows.moveToNext()) {
+                    val path = pathKey(rows.getString(0) ?: continue)
+                    if (path in wantedPaths) result += path to kind
+                }
+            }
+        }
+        return result
+    }
+
+    fun duplicateUris(files: List<Pair<File, MediaKind>>): Map<Pair<String, MediaKind>, List<Uri>> {
+        val requested = files.mapTo(linkedSetOf()) { (file, kind) -> pathKey(file) to kind }
+        val result = HashMap<Pair<String, MediaKind>, MutableList<Uri>>()
+        MediaKind.entries.forEach { kind ->
+            val wantedPaths = requested.filterTo(hashSetOf()) { it.second == kind }.mapTo(hashSetOf()) { it.first }
+            if (wantedPaths.isEmpty()) return@forEach
+            val collection = duplicateCollection(kind)
+            val cursor = context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DATA),
+                null,
+                null,
+                null
+            ) ?: error("无法查询系统媒体库，尚未准备删除")
+            cursor.use { rows ->
+                while (rows.moveToNext()) {
+                    val path = pathKey(rows.getString(1) ?: continue)
+                    if (path !in wantedPaths) continue
+                    result.getOrPut(path to kind) { mutableListOf() }
+                        .add(ContentUris.withAppendedId(collection, rows.getLong(0)))
+                }
+            }
+        }
+        return result.mapValues { (_, uris) -> uris.distinct() }
+    }
+
     private fun queryDetails(uri: Uri, kind: MediaKind, paths: Set<String>, result: MutableMap<String, MediaDetails>) {
         val projection = mutableListOf(
             MediaStore.MediaColumns.DATA,
@@ -169,15 +218,17 @@ class MediaStoreGateway(private val context: Context) {
         )
         if (kind == MediaKind.IMAGE) projection += MediaStore.Images.ImageColumns.ORIENTATION
         if (kind == MediaKind.VIDEO) projection += MediaStore.Video.Media.DURATION
-        context.contentResolver.query(uri, projection.toTypedArray(), null, null, null)?.use { cursor ->
-            while (cursor.moveToNext()) {
-                val path = cursor.getString(0)?.let(::pathKey) ?: continue
+        val cursor = context.contentResolver.query(uri, projection.toTypedArray(), null, null, null)
+            ?: error("无法查询系统媒体库中的重复项信息")
+        cursor.use {
+            while (it.moveToNext()) {
+                val path = it.getString(0)?.let(::pathKey) ?: continue
                 if (path !in paths) continue
-                val width = cursor.getInt(1)
-                val height = cursor.getInt(2)
-                val orientation = if (kind == MediaKind.IMAGE && !cursor.isNull(3)) cursor.getInt(3) else 0
+                val width = it.getInt(1)
+                val height = it.getInt(2)
+                val orientation = if (kind == MediaKind.IMAGE && !it.isNull(3)) it.getInt(3) else 0
                 val durationIndex = if (kind == MediaKind.VIDEO) 3 else -1
-                val duration = if (durationIndex >= 0 && !cursor.isNull(durationIndex)) cursor.getLong(durationIndex) else 0
+                val duration = if (durationIndex >= 0 && !it.isNull(durationIndex)) it.getLong(durationIndex) else 0
                 val rotated = abs(orientation) % 180 == 90
                 val displayWidth = if (rotated) height else width
                 val displayHeight = if (rotated) width else height
@@ -187,6 +238,10 @@ class MediaStoreGateway(private val context: Context) {
             }
         }
     }
+
+    private fun duplicateCollection(kind: MediaKind): Uri =
+        if (kind == MediaKind.IMAGE) MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        else MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
 
     private fun pathKey(path: String): String = runCatching {
         File(path).canonicalPath.lowercase(Locale.ROOT)
