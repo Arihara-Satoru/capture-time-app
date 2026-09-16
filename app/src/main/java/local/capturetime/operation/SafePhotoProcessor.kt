@@ -99,7 +99,11 @@ class SafePhotoProcessor(
                 modified = true
                 if (exifFields.isNotEmpty()) exif.write(descriptor, target, exifFields)
                 exifVerification = if (exifFields.isEmpty() || exif.verify(descriptor, target, exifFields)) "通过" else "失败"
-                require(exifVerification == "通过") { "所选 EXIF 字段核验失败" }
+                require(exifVerification == "通过") {
+                    "所选 EXIF 字段核验失败；目标=${CaptureTimeParser.formatExif(target)} " +
+                        "offset=${CaptureTimeParser.formatExifOffset(target)}；字段=$exifFields；" +
+                        "实际=${exif.readRaw(descriptor)}"
+                }
                 require(descriptorFile.setLastModified(expectedModified)) { "无法设置文件修改时间" }
                 val stat = Os.fstat(descriptor)
                 val modifiedMillis = stat.st_mtim.tv_sec * 1000 + stat.st_mtim.tv_nsec / 1_000_000

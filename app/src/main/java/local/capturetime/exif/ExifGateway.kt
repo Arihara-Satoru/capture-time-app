@@ -1,5 +1,7 @@
 package local.capturetime.exif
 
+import android.system.Os
+import android.system.OsConstants
 import androidx.exifinterface.media.ExifInterface
 import local.capturetime.time.CaptureTimeParser
 import local.capturetime.settings.TimeField
@@ -25,7 +27,12 @@ class ExifGateway {
     }
 
     fun readRaw(descriptor: FileDescriptor): ExifTimes {
-        return readTimes(ExifInterface(descriptor))
+        rewind(descriptor)
+        return try {
+            readTimes(ExifInterface(descriptor))
+        } finally {
+            rewind(descriptor)
+        }
     }
 
     private fun readTimes(exif: ExifInterface): ExifTimes {
@@ -46,7 +53,12 @@ class ExifGateway {
 
     fun write(descriptor: FileDescriptor, target: Instant, fields: Set<TimeField>) {
         JpegStructure.validate(descriptor)
-        writeAttributes(ExifInterface(descriptor), target, fields)
+        rewind(descriptor)
+        try {
+            writeAttributes(ExifInterface(descriptor), target, fields)
+        } finally {
+            rewind(descriptor)
+        }
     }
 
     private fun writeAttributes(exif: ExifInterface, target: Instant, fields: Set<TimeField>) {
@@ -99,5 +111,9 @@ class ExifGateway {
         return CaptureTimeParser.parseExif(actual.original, actual.originalOffset) != expected ||
             CaptureTimeParser.parseExif(actual.digitized, actual.digitizedOffset) != expected ||
             CaptureTimeParser.parseExif(actual.modified, actual.modifiedOffset) != expected
+    }
+
+    private fun rewind(descriptor: FileDescriptor) {
+        Os.lseek(descriptor, 0, OsConstants.SEEK_SET)
     }
 }
