@@ -34,6 +34,17 @@ class DuplicateRulesTest {
         assertEquals("IMG_20260101_120000_1234567890123.jpg", DuplicateRules.findCandidates(files).single().delete.file.name)
     }
 
+    @Test fun `numeric camera copy with rotated display dimensions is detected`() {
+        val files = listOf(
+            image("/DCIM/Camera/IMG_20221203_174311.jpg", 125706, 1440, 1080),
+            image("/DCIM/Camera/IMG_20221203_174311_1788422703200.jpg", 326015, 1920, 1440)
+        )
+        assertEquals(
+            "IMG_20221203_174311.jpg",
+            DuplicateRules.findCandidates(files).single().delete.file.name
+        )
+    }
+
     @Test fun `equal byte sizes are not removed`() {
         val files = listOf(image("/DCIM/IMG_20260101_120000.jpg", 100), image("/DCIM/IMG_20260101_120000_abcdef.jpg", 100))
         assertTrue(DuplicateRules.findCandidates(files).isEmpty())
@@ -62,6 +73,14 @@ class DuplicateRulesTest {
     @Test fun `never compares across folders`() {
         val files = listOf(image("/DCIM/A/IMG_20260101_120000.jpg", 100), image("/DCIM/B/IMG_20260101_120000_abcdef.jpg", 90))
         assertTrue(DuplicateRules.findCandidates(files).isEmpty())
+    }
+
+    @Test fun `normalizes primary storage path aliases before grouping`() {
+        val files = listOf(
+            image("/sdcard/DCIM/IMG_20260101_120000.jpg", 100),
+            image("/storage/emulated/0/DCIM/IMG_20260101_120000_abcdef.jpg", 90)
+        )
+        assertEquals("IMG_20260101_120000_abcdef.jpg", DuplicateRules.findCandidates(files).single().delete.file.name)
     }
 
     private fun image(path: String, size: Long, width: Int = 1000, height: Int = 1000) =

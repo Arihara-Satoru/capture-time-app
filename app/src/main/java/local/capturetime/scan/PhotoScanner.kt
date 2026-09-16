@@ -33,7 +33,7 @@ class PhotoScanner(
             .filter { looksLikeImageName(it.name) }
             .distinctBy { it.absolutePath.lowercase(Locale.ROOT) }
             .toList()
-        return inspectInParallel(files, roots) { file -> mediaIndex[file.absolutePath.lowercase(Locale.ROOT)] }
+        return inspectInParallel(files, roots) { file -> mediaIndex[mediaStore.pathKey(file)] }
     }
 
     fun scan(files: List<File>): List<PhotoRecord> {
@@ -43,7 +43,7 @@ class PhotoScanner(
             .toList()
         // Avoid one ContentResolver query per photo when importing a selection.
         val mediaIndex = mediaStore.queryAll()
-        return inspectInParallel(uniqueFiles, listOf(storage)) { file -> mediaIndex[file.absolutePath.lowercase(Locale.ROOT)] }
+        return inspectInParallel(uniqueFiles, listOf(storage)) { file -> mediaIndex[mediaStore.pathKey(file)] }
     }
 
     private fun inspectInParallel(

@@ -19,7 +19,7 @@ class DuplicateScanner(private val mediaStore: MediaStoreGateway) {
         // File-system discovery is intentionally completed before consulting MediaStore.
         val media = mediaStore.queryDuplicateDetails(realFiles)
         val assets = realFiles.mapNotNull { file ->
-            val details = media[file.absolutePath.lowercase(Locale.ROOT)] ?: return@mapNotNull null
+            val details = media[mediaStore.pathKey(file)] ?: return@mapNotNull null
             if (details.width <= 0 || details.height <= 0) return@mapNotNull null
             DuplicateAsset(file, details.kind, details.width, details.height, details.durationMillis, file.length())
         }

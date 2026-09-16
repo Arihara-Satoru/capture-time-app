@@ -2,6 +2,7 @@ package local.capturetime.duplicate
 
 import java.util.Locale
 import kotlin.math.abs
+import java.io.File
 
 object DuplicateRules {
     private val safeHexCopy = Regex("^((?:IMG|MVIMG)_\\d{8}_\\d{6})_([0-9A-Fa-f]{6})$", RegexOption.IGNORE_CASE)
@@ -119,9 +120,31 @@ object DuplicateRules {
     private fun aspectDifference(a: DuplicateAsset, b: DuplicateAsset): Double =
         abs(a.width.toDouble() / a.height - b.width.toDouble() / b.height)
 
-    private fun directoryKey(asset: DuplicateAsset) = asset.file.parentFile?.absolutePath?.lowercase(Locale.ROOT).orEmpty()
+    private fun directoryKey(asset: DuplicateAsset) = normalizePath(asset.file.parentFile?.absolutePath.orEmpty())
     private fun stem(asset: DuplicateAsset) = asset.file.nameWithoutExtension
     private fun extension(asset: DuplicateAsset) = asset.file.extension.lowercase(Locale.ROOT)
+
+    private fun normalizePath(path: String): String {
+        val slashPath = path.replace('\\', '/').let { value ->
+            if (value.length >= 2 && value[0].isLetter() && value[1] == ':') value.substring(2) else value
+        }
+        val primaryPath = when {
+            slashPath.equals("/sdcard", ignoreCase = true) -> "/storage/emulated/0"
+            slashPath.startsWith("/sdcard/", ignoreCase = true) ->
+                "/storage/emulated/0/" + slashPath.substring("/sdcard/".length)
+            slashPath.equals("/storage/self/primary", ignoreCase = true) -> "/storage/emulated/0"
+            slashPath.startsWith("/storage/self/primary/", ignoreCase = true) ->
+                "/storage/emulated/0/" + slashPath.substring("/storage/self/primary/".length)
+            else -> slashPath
+        }
+        val primary = File(primaryPath)
+        return if (primary.exists()) {
+            runCatching { primary.canonicalPath.replace('\\', '/').lowercase(Locale.ROOT) }
+                .getOrDefault(primaryPath.lowercase(Locale.ROOT))
+        } else {
+            primaryPath.lowercase(Locale.ROOT)
+        }
+    }
 
     private data class CopyName(val base: String, val type: CopyType)
     private enum class CopyType { HEX, NUMERIC, BRACKET }

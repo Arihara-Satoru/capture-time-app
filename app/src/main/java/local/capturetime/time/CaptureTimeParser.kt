@@ -22,8 +22,11 @@ object CaptureTimeParser {
             DateTimeFormatter.ofPattern("uuuuMMdd-HHmmss")
     )
     private val epochMillisPattern = Regex("(?<!\\d)(\\d{13})(?!\\d)")
+    private val cameraTimestampPrefix = Regex("(?i)(?:^|[^A-Za-z0-9])(?:IMG|MVIMG)_$")
     private val earliestFilenameTime = Instant.parse("2000-01-01T00:00:00Z")
     private val latestFilenameTime = Instant.parse("2100-01-01T00:00:00Z")
+
+    private data class FilenameTimeMatch(val range: IntRange, val time: Instant)
 
     fun parseExif(value: String?, offset: String? = null): Instant? {
         if (offset.isNullOrBlank()) return parseLocal(value, exifFormatter)
@@ -48,13 +51,25 @@ object CaptureTimeParser {
 
     private fun parsedFilenameTimes(filenameWithoutExtension: String): List<Instant> {
         val formatted = filenamePatterns.flatMap { (regex, formatter) ->
-            regex.findAll(filenameWithoutExtension).mapNotNull { parseLocal(it.groupValues[1], formatter) }
+            regex.findAll(filenameWithoutExtension).mapNotNull { match ->
+                parseLocal(match.groupValues[1], formatter)?.let { time ->
+                    FilenameTimeMatch(match.range, time)
+                }
+            }
         }
         val epochMillis = epochMillisPattern.findAll(filenameWithoutExtension).mapNotNull { match ->
+            val isCameraCopySuffix = formatted.any { formattedMatch ->
+                formattedMatch.range.last + 2 == match.range.first &&
+                    filenameWithoutExtension[formattedMatch.range.last + 1] == '_' &&
+                    cameraTimestampPrefix.containsMatchIn(
+                        filenameWithoutExtension.substring(0, formattedMatch.range.first)
+                    )
+            }
+            if (isCameraCopySuffix) return@mapNotNull null
             match.groupValues[1].toLongOrNull()?.let(Instant::ofEpochMilli)
                 ?.takeIf { !it.isBefore(earliestFilenameTime) && it.isBefore(latestFilenameTime) }
         }
-        return (formatted + epochMillis).distinct().toList()
+        return (formatted.map { it.time } + epochMillis).distinct().toList()
     }
 
     fun formatExif(value: Instant): String = outputFormatter.format(value)

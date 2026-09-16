@@ -17,6 +17,20 @@ class CaptureTimeParserTest {
     @Test fun parsesThirteenDigitUnixMilliseconds() {
         assertEquals(Instant.ofEpochMilli(1_534_600_669_491), CaptureTimeParser.parseFilename("1534600669491"))
         assertEquals(Instant.ofEpochMilli(1_534_600_669_491), CaptureTimeParser.parseFilename("IMG_1534600669491_copy"))
+        assertEquals(Instant.ofEpochMilli(1_577_440_495_004), CaptureTimeParser.parseFilename("mmexport1577440495004"))
+    }
+
+    @Test fun treatsNumericSuffixAfterCameraTimeAsCopyId() {
+        val expected = Instant.parse("2022-12-03T09:43:11Z")
+        val name = "IMG_20221203_174311_1788422703200"
+        assertEquals(expected, CaptureTimeParser.parseFilename(name))
+        assertTrue(!CaptureTimeParser.hasAmbiguousFilenameTime(name))
+    }
+
+    @Test fun keepsNonCameraFormattedTimeAndEpochTimeAmbiguous() {
+        val name = "backup_20221203_174311_1577440495004"
+        assertTrue(CaptureTimeParser.hasAmbiguousFilenameTime(name))
+        assertNull(CaptureTimeParser.parseFilename(name))
     }
 
     @Test fun rejectsInvalidDatesAndUnsupportedFormats() {
