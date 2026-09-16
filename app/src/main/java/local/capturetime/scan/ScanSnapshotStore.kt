@@ -32,11 +32,16 @@ class ScanSnapshotStore(context: Context) {
                 put("reason", record.reason)
             })
         }
-        file.writeText(array.toString(), Charsets.UTF_8)
+        file.writeText(JSONObject().apply {
+            put("version", SNAPSHOT_VERSION)
+            put("records", array)
+        }.toString(), Charsets.UTF_8)
     }
 
     fun load(): List<PhotoRecord> = runCatching {
-        val array = JSONArray(file.readText(Charsets.UTF_8))
+        val root = JSONObject(file.readText(Charsets.UTF_8))
+        if (root.optInt("version") != SNAPSHOT_VERSION) return emptyList()
+        val array = root.getJSONArray("records")
         buildList(array.length()) {
             for (i in 0 until array.length()) {
                 val item = array.getJSONObject(i)
@@ -61,4 +66,8 @@ class ScanSnapshotStore(context: Context) {
 
     private fun JSONObject.longOrNull(key: String): Long? = if (isNull(key)) null else optLong(key).takeIf { it != 0L }
     private fun JSONObject.stringOrNull(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
+
+    private companion object {
+        const val SNAPSHOT_VERSION = 2
+    }
 }

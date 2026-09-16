@@ -49,7 +49,9 @@ class PhotoAdapter(private val onSelected: (PhotoRecord) -> Unit) : RecyclerView
             title.text = record.file.name
             format.text = " ${record.format.label} · ${if (record.safeForTrial) "可安全试运行" else "需人工确认"} "
             target.text = "目标时间 · ${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}"
-            details.text = "当前 ${CaptureTimeParser.formatDisplay(record.currentCaptureTime)}\n添加 ${CaptureTimeParser.formatDisplay(record.media?.dateAdded)} · 文件名 ${CaptureTimeParser.formatDisplay(record.filenameTime)}"
+            details.text = "当前时间 ${CaptureTimeParser.formatDisplay(record.currentCaptureTime)}\n" +
+                "添加时间 ${CaptureTimeParser.formatDisplay(record.media?.dateAdded)}\n" +
+                "文件名时间 ${CaptureTimeParser.formatDisplay(record.filenameTime)}"
             path.text = record.file.parent ?: record.file.absolutePath
             itemView.contentDescription = "${record.file.name}，${record.format.label}，目标时间 ${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}。${if (itemView.isSelected) "已选择" else "双击选择"}"
             itemView.setOnClickListener {

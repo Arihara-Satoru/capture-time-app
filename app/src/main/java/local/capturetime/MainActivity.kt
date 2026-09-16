@@ -242,8 +242,9 @@ class MainActivity : Activity() {
 
     private fun renderRecords(fresh: Boolean) {
         val candidates = records.filter { it.candidate }
+        val filenameTimes = records.count { it.filenameTime != null }
         adapter.submitList(candidates)
-        scanSummary.text = "$resultSource · 已检查 ${records.size} 张 · 候选 ${candidates.size} 张"
+        scanSummary.text = "$resultSource · 已检查 ${records.size} 张 · 文件名时间 $filenameTimes 张 · 候选 ${candidates.size} 张"
         if (fresh) showStatus(if (records.isEmpty()) "范围内没有可识别图片。" else "扫描记录已保存到应用本机空间。请选择候选进行单张试运行。")
         updateActions()
     }

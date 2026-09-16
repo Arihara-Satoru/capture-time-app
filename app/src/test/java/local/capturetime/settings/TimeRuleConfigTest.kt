@@ -1,5 +1,8 @@
 package local.capturetime.settings
 
+import local.capturetime.exif.ExifTimes
+import local.capturetime.model.MediaSnapshot
+import local.capturetime.time.CaptureTimeParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -19,6 +22,25 @@ class TimeRuleConfigTest {
     @Test fun selectsLatestConfiguredAvailableField() {
         val rule = TimeRuleConfig(TimeSelection.LATEST, setOf(TimeField.FILENAME, TimeField.MEDIA_DATE_ADDED))
         assertEquals(late, rule.selectTarget(mapOf(TimeField.FILENAME to late, TimeField.MEDIA_DATE_ADDED to early)))
+    }
+
+    @Test fun selectsMmexportFilenameTimeWhenItIsEarliestDefaultSource() {
+        val filename = CaptureTimeParser.parseFilename("mmexport1577440495004")
+        val media = MediaSnapshot(
+            1,
+            Instant.parse("2020-01-01T00:00:00Z"),
+            Instant.parse("2021-01-01T00:00:00Z"),
+            1_609_459_200
+        )
+        val values = TimeRuleConfig().values(
+            ExifTimes("2020:01:01 08:00:00", null, null),
+            media,
+            filename,
+            Instant.parse("2022-01-01T00:00:00Z")
+        )
+
+        assertEquals(Instant.ofEpochMilli(1_577_440_495_004), filename)
+        assertEquals(filename, TimeRuleConfig().selectTarget(values))
     }
 
     @Test fun ignoresFieldsThatWereNotSelectedAndReturnsNullWhenUnavailable() {
