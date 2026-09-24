@@ -6,9 +6,12 @@ import org.junit.Test
 import java.io.File
 
 class DuplicateRulesTest {
-    @Test fun `hex suffix only applies to safe timestamp names`() {
-        val unsafe = listOf(image("/DCIM/foo.jpg", 100), image("/DCIM/foo_abcdef.jpg", 90))
-        assertTrue(DuplicateRules.findCandidates(unsafe).isEmpty())
+    @Test fun `underscore suffix matches same directory prefix and hex suffix remains supported`() {
+        val withoutPrefix = listOf(image("/DCIM/foo_abcdef.jpg", 90))
+        assertTrue(DuplicateRules.findCandidates(withoutPrefix).isEmpty())
+
+        val generic = listOf(image("/DCIM/foo.jpg", 100), image("/DCIM/foo_abcdef.jpg", 90))
+        assertEquals("foo_abcdef.jpg", DuplicateRules.findCandidates(generic).single().delete.file.name)
 
         val safe = listOf(image("/DCIM/IMG_20260101_120000.jpg", 100), image("/DCIM/IMG_20260101_120000_abcdef.jpg", 90))
         assertEquals(listOf("IMG_20260101_120000_abcdef.jpg"), DuplicateRules.findCandidates(safe).map { it.delete.file.name })

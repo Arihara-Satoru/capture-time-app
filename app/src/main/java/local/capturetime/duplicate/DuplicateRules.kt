@@ -32,8 +32,16 @@ object DuplicateRules {
     fun hasMatchingContent(candidate: DuplicateCandidate): Boolean =
         candidate.delete.sha256.isNotBlank() && candidate.delete.sha256 == candidate.retained.sha256
 
+    fun isEligibleCandidate(candidate: DuplicateCandidate): Boolean =
+        hasMatchingContent(candidate) ||
+            (candidate.matchedByUnderscorePrefix && isUnderscorePrefixPair(candidate))
+
     private fun findImageCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
-        return assets.groupBy { extension(it) }.values.flatMap { sameExtension ->
+        val prefixCandidates = findUnderscoreCandidates(assets)
+        val prefixPairPaths = prefixCandidates
+            .flatMap { listOf(it.delete.file.absolutePath, it.retained.file.absolutePath) }
+            .toSet()
+        val existingCandidates = assets.groupBy { extension(it) }.values.flatMap { sameExtension ->
             val byStem = sameExtension.associateBy { stem(it).lowercase(Locale.ROOT) }
             val grouped = linkedMapOf<String, MutableList<DuplicateAsset>>()
             sameExtension.forEach { asset ->
@@ -70,7 +78,55 @@ object DuplicateRules {
                 }
             }
             grouped.values.flatMap(::compareImageGroup)
+                .filterNot {
+                    it.delete.file.absolutePath in prefixPairPaths ||
+                        it.retained.file.absolutePath in prefixPairPaths
+                }
         }
+        return existingCandidates + prefixCandidates
+    }
+
+    private fun findUnderscoreCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
+        val byStem = assets.groupBy { stem(it).lowercase(Locale.ROOT) }
+        return assets.mapNotNull { copy ->
+            val copyStem = stem(copy)
+            val underscore = copyStem.indexOf('_')
+            if (underscore <= 0 || underscore == copyStem.lastIndex) return@mapNotNull null
+
+            val prefix = copyStem.substring(0, underscore)
+            val matches = byStem[prefix.lowercase(Locale.ROOT)].orEmpty()
+                .filter { it.file.absolutePath != copy.file.absolutePath }
+            val original = matches.firstOrNull { stem(it) == prefix && extension(it) == extension(copy) }
+                ?: matches.filter { extension(it) == extension(copy) }.singleOrNull()
+                ?: matches.singleOrNull()
+                ?: return@mapNotNull null
+            val deleteCopy = when {
+                copy.pixels != original.pixels -> copy.pixels < original.pixels
+                copy.size != original.size -> copy.size < original.size
+                else -> true
+            }
+            val (delete, retained) = if (deleteCopy) copy to original else original to copy
+            DuplicateCandidate(
+                delete = delete,
+                retained = retained,
+                reason = "文件名前缀“$prefix”与同目录图片匹配；内容可能不同，默认保留像素较多或同分辨率下较大的文件，请比对后确认",
+                matchedByUnderscorePrefix = true
+            )
+        }
+    }
+
+    private fun isUnderscorePrefixPair(candidate: DuplicateCandidate): Boolean {
+        if (candidate.delete.kind != MediaKind.IMAGE || candidate.retained.kind != MediaKind.IMAGE) return false
+        if (directoryKey(candidate.delete) != directoryKey(candidate.retained)) return false
+        return isUnderscorePrefixPair(candidate.delete, candidate.retained) ||
+            isUnderscorePrefixPair(candidate.retained, candidate.delete)
+    }
+
+    private fun isUnderscorePrefixPair(copy: DuplicateAsset, original: DuplicateAsset): Boolean {
+        val copyStem = stem(copy)
+        val underscore = copyStem.indexOf('_')
+        return underscore > 0 && underscore < copyStem.lastIndex &&
+            copyStem.substring(0, underscore).equals(stem(original), ignoreCase = true)
     }
 
     private fun compareImageGroup(group: List<DuplicateAsset>): List<DuplicateCandidate> {

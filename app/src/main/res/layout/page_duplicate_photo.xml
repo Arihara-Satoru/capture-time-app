@@ -24,7 +24,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="严格重复清理"
+                android:text="重复照片清理"
                 android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                 android:textColor="?attr/colorOnSecondaryContainer"
                 android:textStyle="bold" />
@@ -36,7 +36,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:minHeight="48dp"
-                android:text="扫描严格重复项"
+                android:text="扫描重复项"
                 app:icon="@drawable/ic_scan" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
@@ -83,7 +83,7 @@
         android:layout_marginTop="8dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:contentDescription="严格重复项列表"
+        android:contentDescription="重复项列表"
         android:paddingBottom="8dp" />
 
     <com.google.android.material.button.MaterialButton

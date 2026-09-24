@@ -20,7 +20,8 @@ data class DuplicateAsset(
 data class DuplicateCandidate(
     val delete: DuplicateAsset,
     val retained: DuplicateAsset,
-    val reason: String
+    val reason: String,
+    val matchedByUnderscorePrefix: Boolean = false
 )
 
 data class DuplicateScanResult(
