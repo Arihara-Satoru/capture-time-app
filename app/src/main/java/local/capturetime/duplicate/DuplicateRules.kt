@@ -8,6 +8,7 @@ object DuplicateRules {
     private val safeHexCopy = Regex("^((?:IMG|MVIMG)_\\d{8}_\\d{6})_([0-9A-Fa-f]{6})$", RegexOption.IGNORE_CASE)
     private val safeVideoHexCopy = Regex("^(VID_\\d{8}_\\d{6})_([0-9A-Fa-f]{6})$", RegexOption.IGNORE_CASE)
     private val numericCopy = Regex("^(.+)_([0-9]{13})$")
+    private val hexCopy = Regex("^(.+)_([0-9A-Fa-f]{6})$")
     private val bracketCopy = Regex("^(.+?)\\s*\\(([0-9]+)\\)$")
 
     fun findCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
@@ -41,9 +42,7 @@ object DuplicateRules {
         val prefixPairs = prefixCandidates.mapTo(hashSetOf<Set<String>>()) {
             setOf(it.delete.file.absolutePath, it.retained.file.absolutePath)
         }
-        val (baseNameCandidates, baseNamePairs) = findCommonBaseCandidates(assets)
-        val nameRuleDeletePaths = (prefixCandidates + baseNameCandidates)
-            .mapTo(hashSetOf()) { it.delete.file.absolutePath }
+        val (suffixCandidates, suffixGroupPaths) = findNumericHexCandidates(assets)
         val existingCandidates = assets.groupBy { extension(it) }.values.flatMap { sameExtension ->
             val byStem = sameExtension.associateBy { stem(it).lowercase(Locale.ROOT) }
             val grouped = linkedMapOf<String, MutableList<DuplicateAsset>>()
@@ -83,11 +82,11 @@ object DuplicateRules {
             grouped.values.flatMap(::compareImageGroup)
                 .filterNot {
                     setOf(it.delete.file.absolutePath, it.retained.file.absolutePath) in prefixPairs ||
-                        setOf(it.delete.file.absolutePath, it.retained.file.absolutePath) in baseNamePairs ||
-                        it.delete.file.absolutePath in nameRuleDeletePaths
+                        (it.delete.file.absolutePath in suffixGroupPaths &&
+                            it.retained.file.absolutePath in suffixGroupPaths)
                 }
         }
-        return prefixCandidates + baseNameCandidates + existingCandidates
+        return existingCandidates + prefixCandidates + suffixCandidates
     }
 
     private fun findUnderscoreCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
@@ -119,38 +118,42 @@ object DuplicateRules {
         }
     }
 
-    private fun findCommonBaseCandidates(assets: List<DuplicateAsset>): Pair<List<DuplicateCandidate>, Set<Set<String>>> {
-        // ponytail: Last-underscore matching may surface unrelated images; content-similarity ranking is a future refinement.
-        val groups = linkedMapOf<String, MutableList<DuplicateAsset>>()
-        val assetsByStem = assets.groupBy { stem(it).lowercase(Locale.ROOT) }
+    private fun findNumericHexCandidates(assets: List<DuplicateAsset>): Pair<List<DuplicateCandidate>, Set<String>> {
+        val baseNames = assets.mapTo(hashSetOf()) { stem(it).lowercase(Locale.ROOT) }
+        val groups = linkedMapOf<String, MutableList<Pair<DuplicateAsset, Boolean>>>()
         assets.forEach { asset ->
-            val base = commonBase(stem(asset)) ?: return@forEach
-            groups.getOrPut(base.lowercase(Locale.ROOT)) { mutableListOf() } += asset
+            val numeric = numericCopy.matchEntire(stem(asset))
+            val hex = hexCopy.matchEntire(stem(asset))
+            val (base, isHex) = when {
+                numeric != null -> numeric.groupValues[1] to false
+                hex != null -> hex.groupValues[1] to true
+                else -> return@forEach
+            }
+            groups.getOrPut(base.lowercase(Locale.ROOT)) { mutableListOf() }.add(asset to isHex)
         }
 
         val candidates = mutableListOf<DuplicateCandidate>()
-        val candidatePairs = hashSetOf<Set<String>>()
+        val groupPaths = hashSetOf<String>()
         groups.forEach { (base, variants) ->
-            val baseFiles = assetsByStem[base].orEmpty()
-            val group = (variants + baseFiles).distinctBy { it.file.absolutePath }
-            if (group.size < 2) return@forEach
-            val retained = group.maxWithOrNull(
-                compareBy<DuplicateAsset> { it.pixels }
-                    .thenBy { it.size }
-                    .thenBy { stem(it).equals(base, ignoreCase = true) }
-                    .thenByDescending { it.file.name.lowercase(Locale.ROOT) }
-            ) ?: return@forEach
-            group.filter { it.file.absolutePath != retained.file.absolutePath }.forEach { delete ->
-                candidates += DuplicateCandidate(
-                    delete = delete,
-                    retained = retained,
-                    reason = "同目录图片共用基名“$base”；内容可能不同，请比对后确认",
-                    matchedByNameRule = true
-                )
-                candidatePairs += setOf(delete.file.absolutePath, retained.file.absolutePath)
-            }
+            val numeric = variants.filterNot { it.second }
+            val hex = variants.filter { it.second }
+            if (base in baseNames || numeric.size != 1 || hex.size != 1) return@forEach
+            val pair = listOf(numeric.single().first, hex.single().first)
+            groupPaths += pair.map { it.file.absolutePath }
+            val retained = variants.maxWithOrNull(
+                compareBy<Pair<DuplicateAsset, Boolean>> { it.first.pixels }
+                    .thenBy { it.first.size }
+                    .thenBy { if (it.second) 1 else 0 }
+            )?.first ?: return@forEach
+            val delete = pair.single { it.file.absolutePath != retained.file.absolutePath }
+            candidates += DuplicateCandidate(
+                delete = delete,
+                retained = retained,
+                reason = "同目录 13 位数字后缀与 6 位十六进制后缀共享基名；内容可能不同，请比对后确认",
+                matchedByNameRule = true
+            )
         }
-        return candidates to candidatePairs
+        return candidates to groupPaths
     }
 
     private fun isNameRulePair(candidate: DuplicateCandidate): Boolean {
@@ -158,7 +161,8 @@ object DuplicateRules {
         if (directoryKey(candidate.delete) != directoryKey(candidate.retained)) return false
         return isPrefixPair(candidate.delete, candidate.retained) ||
             isPrefixPair(candidate.retained, candidate.delete) ||
-            isCommonBasePair(candidate.delete, candidate.retained)
+            isNumericHexPair(candidate.delete, candidate.retained) ||
+            isNumericHexPair(candidate.retained, candidate.delete)
     }
 
     private fun isPrefixPair(copy: DuplicateAsset, original: DuplicateAsset): Boolean {
@@ -168,20 +172,10 @@ object DuplicateRules {
             copyStem.substring(0, underscore).equals(stem(original), ignoreCase = true)
     }
 
-    private fun isCommonBasePair(first: DuplicateAsset, second: DuplicateAsset): Boolean {
-        val firstStem = stem(first)
-        val secondStem = stem(second)
-        val firstBase = commonBase(firstStem)
-        val secondBase = commonBase(secondStem)
-        return firstBase?.equals(secondStem, ignoreCase = true) == true ||
-            secondBase?.equals(firstStem, ignoreCase = true) == true ||
-            (firstBase != null && secondBase != null && firstBase.equals(secondBase, ignoreCase = true))
-    }
-
-    private fun commonBase(stem: String): String? {
-        val separator = stem.lastIndexOf('_')
-        if (separator <= 0 || separator == stem.lastIndex) return null
-        return stem.substring(0, separator)
+    private fun isNumericHexPair(numeric: DuplicateAsset, hex: DuplicateAsset): Boolean {
+        val numericBase = numericCopy.matchEntire(stem(numeric))?.groupValues?.get(1) ?: return false
+        val hexBase = hexCopy.matchEntire(stem(hex))?.groupValues?.get(1) ?: return false
+        return numericBase.equals(hexBase, ignoreCase = true)
     }
 
     private fun compareImageGroup(group: List<DuplicateAsset>): List<DuplicateCandidate> {
