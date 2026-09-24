@@ -464,7 +464,7 @@ class MainActivity : Activity() {
         val bytes = selectedCandidates.sumOf { it.delete.size }
         MaterialAlertDialogBuilder(this)
             .setTitle("确认备份并删除？")
-            .setMessage("将处理 ${selectedCandidates.size} 个候选，约 ${formatBytes(bytes)}。\n\n下划线前缀规则只表示同目录文件名关联，两张图的内容可能不同；请先点“比对”确认待处理项。执行前会分别重新核验两张图，并按原始相对路径备份待处理文件、校验备份 SHA-256，随后显示 Android 系统删除确认。已有 .temp 备份绝不删除。")
+            .setMessage("将处理 ${selectedCandidates.size} 个候选，约 ${formatBytes(bytes)}。\n\n文件名规则只表示同目录文件名关联，两张图的内容可能不同；请先点“比对”确认待处理项。执行前会分别重新核验两张图，并按原始相对路径备份待处理文件、校验备份 SHA-256，随后显示 Android 系统删除确认。已有 .temp 备份绝不删除。")
             .setNegativeButton("取消", null)
             .setPositiveButton("确认执行") { _, _ -> deleteDuplicates(selectedCandidates) }
             .show()

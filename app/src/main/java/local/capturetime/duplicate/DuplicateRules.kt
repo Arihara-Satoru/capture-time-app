@@ -34,13 +34,16 @@ object DuplicateRules {
 
     fun isEligibleCandidate(candidate: DuplicateCandidate): Boolean =
         hasMatchingContent(candidate) ||
-            (candidate.matchedByUnderscorePrefix && isUnderscorePrefixPair(candidate))
+            (candidate.matchedByNameRule && isNameRulePair(candidate))
 
     private fun findImageCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
         val prefixCandidates = findUnderscoreCandidates(assets)
         val prefixPairs = prefixCandidates.mapTo(hashSetOf<Set<String>>()) {
             setOf(it.delete.file.absolutePath, it.retained.file.absolutePath)
         }
+        val (baseNameCandidates, baseNamePairs) = findCommonBaseCandidates(assets)
+        val nameRuleDeletePaths = (prefixCandidates + baseNameCandidates)
+            .mapTo(hashSetOf()) { it.delete.file.absolutePath }
         val existingCandidates = assets.groupBy { extension(it) }.values.flatMap { sameExtension ->
             val byStem = sameExtension.associateBy { stem(it).lowercase(Locale.ROOT) }
             val grouped = linkedMapOf<String, MutableList<DuplicateAsset>>()
@@ -79,10 +82,12 @@ object DuplicateRules {
             }
             grouped.values.flatMap(::compareImageGroup)
                 .filterNot {
-                    setOf(it.delete.file.absolutePath, it.retained.file.absolutePath) in prefixPairs
+                    setOf(it.delete.file.absolutePath, it.retained.file.absolutePath) in prefixPairs ||
+                        setOf(it.delete.file.absolutePath, it.retained.file.absolutePath) in baseNamePairs ||
+                        it.delete.file.absolutePath in nameRuleDeletePaths
                 }
         }
-        return existingCandidates + prefixCandidates
+        return prefixCandidates + baseNameCandidates + existingCandidates
     }
 
     private fun findUnderscoreCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
@@ -109,23 +114,74 @@ object DuplicateRules {
                 delete = delete,
                 retained = retained,
                 reason = "文件名前缀“$prefix”与同目录图片匹配；内容可能不同，默认保留像素较多或同分辨率下较大的文件，请比对后确认",
-                matchedByUnderscorePrefix = true
+                matchedByNameRule = true
             )
         }
     }
 
-    private fun isUnderscorePrefixPair(candidate: DuplicateCandidate): Boolean {
-        if (candidate.delete.kind != MediaKind.IMAGE || candidate.retained.kind != MediaKind.IMAGE) return false
-        if (directoryKey(candidate.delete) != directoryKey(candidate.retained)) return false
-        return isUnderscorePrefixPair(candidate.delete, candidate.retained) ||
-            isUnderscorePrefixPair(candidate.retained, candidate.delete)
+    private fun findCommonBaseCandidates(assets: List<DuplicateAsset>): Pair<List<DuplicateCandidate>, Set<Set<String>>> {
+        // ponytail: Last-underscore matching may surface unrelated images; content-similarity ranking is a future refinement.
+        val groups = linkedMapOf<String, MutableList<DuplicateAsset>>()
+        val assetsByStem = assets.groupBy { stem(it).lowercase(Locale.ROOT) }
+        assets.forEach { asset ->
+            val base = commonBase(stem(asset)) ?: return@forEach
+            groups.getOrPut(base.lowercase(Locale.ROOT)) { mutableListOf() } += asset
+        }
+
+        val candidates = mutableListOf<DuplicateCandidate>()
+        val candidatePairs = hashSetOf<Set<String>>()
+        groups.forEach { (base, variants) ->
+            val baseFiles = assetsByStem[base].orEmpty()
+            val group = (variants + baseFiles).distinctBy { it.file.absolutePath }
+            if (group.size < 2) return@forEach
+            val retained = group.maxWithOrNull(
+                compareBy<DuplicateAsset> { it.pixels }
+                    .thenBy { it.size }
+                    .thenBy { stem(it).equals(base, ignoreCase = true) }
+                    .thenByDescending { it.file.name.lowercase(Locale.ROOT) }
+            ) ?: return@forEach
+            group.filter { it.file.absolutePath != retained.file.absolutePath }.forEach { delete ->
+                candidates += DuplicateCandidate(
+                    delete = delete,
+                    retained = retained,
+                    reason = "同目录图片共用基名“$base”；内容可能不同，请比对后确认",
+                    matchedByNameRule = true
+                )
+                candidatePairs += setOf(delete.file.absolutePath, retained.file.absolutePath)
+            }
+        }
+        return candidates to candidatePairs
     }
 
-    private fun isUnderscorePrefixPair(copy: DuplicateAsset, original: DuplicateAsset): Boolean {
+    private fun isNameRulePair(candidate: DuplicateCandidate): Boolean {
+        if (candidate.delete.kind != MediaKind.IMAGE || candidate.retained.kind != MediaKind.IMAGE) return false
+        if (directoryKey(candidate.delete) != directoryKey(candidate.retained)) return false
+        return isPrefixPair(candidate.delete, candidate.retained) ||
+            isPrefixPair(candidate.retained, candidate.delete) ||
+            isCommonBasePair(candidate.delete, candidate.retained)
+    }
+
+    private fun isPrefixPair(copy: DuplicateAsset, original: DuplicateAsset): Boolean {
         val copyStem = stem(copy)
         val underscore = copyStem.indexOf('_')
         return underscore > 0 && underscore < copyStem.lastIndex &&
             copyStem.substring(0, underscore).equals(stem(original), ignoreCase = true)
+    }
+
+    private fun isCommonBasePair(first: DuplicateAsset, second: DuplicateAsset): Boolean {
+        val firstStem = stem(first)
+        val secondStem = stem(second)
+        val firstBase = commonBase(firstStem)
+        val secondBase = commonBase(secondStem)
+        return firstBase?.equals(secondStem, ignoreCase = true) == true ||
+            secondBase?.equals(firstStem, ignoreCase = true) == true ||
+            (firstBase != null && secondBase != null && firstBase.equals(secondBase, ignoreCase = true))
+    }
+
+    private fun commonBase(stem: String): String? {
+        val separator = stem.lastIndexOf('_')
+        if (separator <= 0 || separator == stem.lastIndex) return null
+        return stem.substring(0, separator)
     }
 
     private fun compareImageGroup(group: List<DuplicateAsset>): List<DuplicateCandidate> {

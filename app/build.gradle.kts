@@ -11,8 +11,8 @@ android {
         applicationId = "local.capturetime"
         minSdk = 30
         targetSdk = 35
-        versionCode = 18
-        versionName = "1.4.6"
+        versionCode = 19
+        versionName = "1.4.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

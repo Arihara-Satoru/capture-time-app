@@ -21,7 +21,7 @@ data class DuplicateCandidate(
     val delete: DuplicateAsset,
     val retained: DuplicateAsset,
     val reason: String,
-    val matchedByUnderscorePrefix: Boolean = false
+    val matchedByNameRule: Boolean = false
 )
 
 data class DuplicateScanResult(
