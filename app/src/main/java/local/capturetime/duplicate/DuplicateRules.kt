@@ -38,9 +38,9 @@ object DuplicateRules {
 
     private fun findImageCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
         val prefixCandidates = findUnderscoreCandidates(assets)
-        val prefixPairPaths = prefixCandidates
-            .flatMap { listOf(it.delete.file.absolutePath, it.retained.file.absolutePath) }
-            .toSet()
+        val prefixPairs = prefixCandidates.mapTo(hashSetOf<Set<String>>()) {
+            setOf(it.delete.file.absolutePath, it.retained.file.absolutePath)
+        }
         val existingCandidates = assets.groupBy { extension(it) }.values.flatMap { sameExtension ->
             val byStem = sameExtension.associateBy { stem(it).lowercase(Locale.ROOT) }
             val grouped = linkedMapOf<String, MutableList<DuplicateAsset>>()
@@ -79,8 +79,7 @@ object DuplicateRules {
             }
             grouped.values.flatMap(::compareImageGroup)
                 .filterNot {
-                    it.delete.file.absolutePath in prefixPairPaths ||
-                        it.retained.file.absolutePath in prefixPairPaths
+                    setOf(it.delete.file.absolutePath, it.retained.file.absolutePath) in prefixPairs
                 }
         }
         return existingCandidates + prefixCandidates
