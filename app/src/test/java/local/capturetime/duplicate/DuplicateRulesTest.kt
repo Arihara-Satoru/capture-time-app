@@ -17,9 +17,9 @@ class DuplicateRulesTest {
         assertEquals(listOf("IMG_20260101_120000_abcdef.jpg"), DuplicateRules.findCandidates(safe).map { it.delete.file.name })
     }
 
-    @Test fun `ordinary timestamp is not treated as a hex suffix`() {
+    @Test fun `ordinary timestamp suffix sharing a base is a candidate`() {
         val files = listOf(image("/DCIM/IMG_20260101.jpg", 100), image("/DCIM/IMG_20260101_120000.jpg", 90))
-        assertTrue(DuplicateRules.findCandidates(files).isEmpty())
+        assertEquals("IMG_20260101_120000.jpg", DuplicateRules.findCandidates(files).single().delete.file.name)
     }
 
     @Test fun `numeric and bracket copies require original`() {
@@ -61,9 +61,9 @@ class DuplicateRulesTest {
         assertEquals("IMG_20260101_120000.jpg", DuplicateRules.findCandidates(files).single().delete.file.name)
     }
 
-    @Test fun `same screenshot name across formats is not auto deleted`() {
+    @Test fun `same screenshot base across formats is a candidate`() {
         val files = listOf(image("/Pictures/Screenshot_demo.png", 80), image("/Pictures/Screenshot_demo.jpg", 100))
-        assertTrue(DuplicateRules.findCandidates(files).isEmpty())
+        assertEquals("Screenshot_demo.png", DuplicateRules.findCandidates(files).single().delete.file.name)
     }
 
     @Test fun `video requires exact metadata and keeps original`() {
