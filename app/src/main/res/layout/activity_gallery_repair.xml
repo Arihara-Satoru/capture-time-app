@@ -25,6 +25,17 @@
                 <TextView android:id="@+id/galleryRootStatus" android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="10dp" android:text="尚未请求 Root 授权" android:textStyle="bold"
                     android:textAppearance="@style/TextAppearance.Material3.LabelLarge" android:textColor="?attr/colorOnPrimaryContainer" />
+                <RadioGroup android:id="@+id/galleryRootMode" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical">
+                    <com.google.android.material.radiobutton.MaterialRadioButton
+                        android:id="@+id/galleryRootModeBoth" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:minHeight="48dp" android:checked="true"
+                        android:text="拍摄时间和添加时间统一" />
+                    <com.google.android.material.radiobutton.MaterialRadioButton
+                        android:id="@+id/galleryRootModeCapture" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:minHeight="48dp"
+                        android:text="只修拍摄时间，保留添加时间" />
+                </RadioGroup>
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/galleryRootScan" android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="8dp" android:minHeight="48dp" android:text="授权 Root 并检查" app:icon="@drawable/ic_scan" />

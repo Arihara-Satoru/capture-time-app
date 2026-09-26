@@ -67,6 +67,12 @@ public final class GalleryTimeRepair {
             && actual.substring(dot + 1, dot + 7).matches("[0-9a-f]{6}");
     }
 
+    static boolean repairAdded(String mode) {
+        if (mode.equals("both")) return true;
+        if (mode.equals("capture")) return false;
+        throw new IllegalArgumentException("Unknown repair mode: " + mode);
+    }
+
     public static void main(String[] args) {
         try {
             run(args);
@@ -144,6 +150,7 @@ public final class GalleryTimeRepair {
                         current = row(c);
                     }
                     long target = old.getLong("target");
+                    boolean includeAdded = repairAdded(old.optString("repairMode", "both"));
                     Long now = trustedTime(current);
                     if (now == null || now.longValue() != target) throw new IllegalStateException("File evidence changed: " + id[0]);
                     if (apply) {
@@ -153,13 +160,16 @@ public final class GalleryTimeRepair {
                         ContentValues v = new ContentValues();
                         v.put("dateTaken", target);
                         v.put("mixedDateTime", target);
-                        v.put("dateModified", target);
+                        if (includeAdded) v.put("dateModified", target);
                         v.put("exifDateTime", PARSER.formatExif(Instant.ofEpochMilli(target)));
                         if (db.update("cloud", v, "_id=?", id) != 1) throw new IllegalStateException("Unexpected row count");
                     } else {
-                        for (String key : new String[]{"dateTaken", "mixedDateTime", "dateModified"}) {
+                        for (String key : new String[]{"dateTaken", "mixedDateTime"}) {
                             if (current.getLong(key) != target) throw new IllegalStateException("Verification failed " + key + ": " + id[0]);
                         }
+                        if (includeAdded ? current.getLong("dateModified") != target
+                            : !String.valueOf(current.get("dateModified")).equals(String.valueOf(old.get("dateModified"))))
+                            throw new IllegalStateException("Verification failed dateModified: " + id[0]);
                         if (!current.getString("exifDateTime").equals(PARSER.formatExif(Instant.ofEpochMilli(target))))
                             throw new IllegalStateException("Verification failed exifDateTime: " + id[0]);
                     }

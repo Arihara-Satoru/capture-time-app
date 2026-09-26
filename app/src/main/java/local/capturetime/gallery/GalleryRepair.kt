@@ -18,16 +18,17 @@ import java.util.concurrent.TimeUnit
 class GalleryRepair(private val context: Context) {
     data class Preview(val rows: List<JSONObject>, val inspected: Int, val cloudOnly: Int)
 
-    fun scan(rule: TimeRuleConfig): Preview {
+    fun scan(rule: TimeRuleConfig, includeAdded: Boolean): Preview {
         check(!BackupOperationGuard.isCleanupBlocked(context)) { "请先完成正在进行或等待核验的照片操作" }
         val result = root("local.capturetime.gallery.GalleryTimeRepair", listOf("plan"))
         val parsed = JSONArray(result.first)
+        val fields = if (includeAdded) listOf("dateTaken", "mixedDateTime", "dateModified") else listOf("dateTaken", "mixedDateTime")
         val rows = (0 until parsed.length()).map(parsed::getJSONObject).filter { row ->
             val target = Instant.ofEpochMilli(row.getLong("target"))
-            listOf("dateTaken", "mixedDateTime", "dateModified").any { field ->
+            fields.any { field ->
                 rule.needsChange(if (row.isNull(field)) null else Instant.ofEpochMilli(row.getLong(field)), target)
             }
-        }
+        }.onEach { it.put("repairMode", if (includeAdded) "both" else "capture") }
         return Preview(
             rows,
             Regex("Inspected=(\\d+)").find(result.second)?.groupValues?.get(1)?.toIntOrNull() ?: parsed.length(),

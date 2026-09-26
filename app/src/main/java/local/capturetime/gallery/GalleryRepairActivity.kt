@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ProgressBar
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -32,6 +33,7 @@ class GalleryRepairActivity : Activity() {
     private val chosen = linkedSetOf<Long>()
     private var rows = emptyList<JSONObject>()
     private var busy = false
+    private var includeAdded = true
     private var exportSession: File? = null
     private val listAdapter = CandidateAdapter()
     private val summary by lazy { findViewById<TextView>(R.id.galleryRootSummary) }
@@ -41,6 +43,16 @@ class GalleryRepairActivity : Activity() {
         super.onCreate(state)
         setContentView(R.layout.activity_gallery_repair)
         exportSession = state?.getString("export_session")?.let(::File)
+        includeAdded = state?.getBoolean("include_added", true) ?: true
+        findViewById<RadioGroup>(R.id.galleryRootMode).apply {
+            check(if (includeAdded) R.id.galleryRootModeBoth else R.id.galleryRootModeCapture)
+            setOnCheckedChangeListener { _, checkedId ->
+                includeAdded = checkedId == R.id.galleryRootModeBoth
+                rows = emptyList(); chosen.clear(); listAdapter.notifyDataSetChanged()
+                summary.text = "模式已切换。请重新检查相册时间。"
+                updateActions()
+            }
+        }
         findViewById<MaterialToolbar>(R.id.galleryRootToolbar).setNavigationOnClickListener { if (!busy) finish() }
         findViewById<RecyclerView>(R.id.galleryRootList).apply {
             layoutManager = LinearLayoutManager(this@GalleryRepairActivity)
@@ -70,6 +82,7 @@ class GalleryRepairActivity : Activity() {
     override fun onDestroy() { executor.shutdown(); super.onDestroy() }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("export_session", exportSession?.path)
+        outState.putBoolean("include_added", includeAdded)
         super.onSaveInstanceState(outState)
     }
     @Deprecated("Legacy Activity navigation") override fun onBackPressed() {
@@ -78,7 +91,8 @@ class GalleryRepairActivity : Activity() {
 
     private fun scan() {
         rows = emptyList(); chosen.clear(); listAdapter.notifyDataSetChanged()
-        work("正在请求 Root 并读取相册时间，照片较多时需要一些时间…", { repair.scan(TimeRuleConfig.load(applicationContext)) }) { preview ->
+        val scanAdded = includeAdded
+        work("正在请求 Root 并读取相册时间，照片较多时需要一些时间…", { repair.scan(TimeRuleConfig.load(applicationContext), scanAdded) }) { preview ->
             rows = preview.rows
             status.text = "Root 已授权 · 检查完成"
             findViewById<Button>(R.id.galleryRootScan).text = "重新检查"
@@ -86,9 +100,10 @@ class GalleryRepairActivity : Activity() {
             fun differs(row: JSONObject, field: String): Boolean = rule.needsChange(
                 if (row.isNull(field)) null else Instant.ofEpochMilli(row.getLong(field)), Instant.ofEpochMilli(row.getLong("target")))
             val capture = rows.count { differs(it, "dateTaken") || differs(it, "mixedDateTime") }
-            val added = rows.count { differs(it, "dateModified") }
-            summary.text = "已检查有本地路径 ${preview.inspected} 张 · 云端无原图 ${preview.cloudOnly} 张待核对\n拍摄排序待修 $capture 张 · 添加排序待修 $added 张\n" +
-                if (rows.isEmpty()) "当前没有超过忽略误差、且文件名、EXIF、文件修改时间一致的待修复照片。" else "两种排序均按可靠拍摄时间修正。勾选照片后先备份，再修复相册时间。"
+            val modeSummary = if (scanAdded) "拍摄排序待修 $capture 张 · 添加排序待修 ${rows.count { differs(it, "dateModified") }} 张"
+                else "拍摄排序待修 $capture 张 · 添加排序保持原值"
+            summary.text = "已检查有本地路径 ${preview.inspected} 张 · 云端无原图 ${preview.cloudOnly} 张待核对\n$modeSummary\n" +
+                if (rows.isEmpty()) "当前没有超过忽略误差、且文件名、EXIF、文件修改时间一致的待修复照片。" else "勾选照片后先备份，再按所选模式修复相册时间。"
             listAdapter.notifyDataSetChanged()
         }
     }
@@ -97,7 +112,7 @@ class GalleryRepairActivity : Activity() {
         val selected = rows.filter { it.getLong("_id") in chosen }
         if (selected.isEmpty()) return
         MaterialAlertDialogBuilder(this).setTitle("修复 ${selected.size} 张照片的相册时间？")
-            .setMessage("将暂停小米相册、备份数据库，再修复已勾选照片的相册时间。完成后核验照片哈希并重新打开小米相册。\n\n备份保存在本应用中，可从“会话记录与备份”导出；卸载应用前请先导出。")
+            .setMessage("将暂停小米相册、备份数据库，再${if (includeAdded) "统一拍摄和添加时间" else "只修拍摄时间，保留添加时间"}。完成后核验照片哈希并重新打开小米相册。\n\n备份保存在本应用中，可从“会话记录与备份”导出；卸载应用前请先导出。")
             .setNegativeButton("取消", null).setPositiveButton("备份并修复") { _, _ ->
                 work("正在创建修复会话…", { repair.repair(selected, ::progress) }) { session ->
                     rows = rows.filterNot { it.getLong("_id") in chosen }
@@ -137,6 +152,9 @@ class GalleryRepairActivity : Activity() {
 
     private fun updateActions() {
         val recovery = BackupOperationGuard.hasGalleryState(this)
+        findViewById<RadioGroup>(R.id.galleryRootMode).apply {
+            for (index in 0 until childCount) getChildAt(index).isEnabled = !busy && !recovery
+        }
         findViewById<ProgressBar>(R.id.galleryRootProgress).visibility = if (busy) View.VISIBLE else View.GONE
         findViewById<Button>(R.id.galleryRootScan).isEnabled = !busy && !recovery
         findViewById<Button>(R.id.galleryRootSelectAll).apply {
@@ -202,7 +220,8 @@ class GalleryRepairActivity : Activity() {
             fun time(key: String) = CaptureTimeParser.formatDisplay(if (row.isNull(key)) null else Instant.ofEpochMilli(row.getLong(key)))
             holder.check.apply {
                 setOnCheckedChangeListener(null)
-                text = "${row.getString("fileName")}\n拍摄排序 ${time("dateTaken")}\n添加排序 ${time("dateModified")}\n建议时间 ${time("target")}\n${File(row.getString("localFile")).parent}"
+                val captureOnly = row.optString("repairMode") == "capture"
+                text = "${row.getString("fileName")}\n拍摄排序 ${time("dateTaken")}\n添加排序${if (captureOnly) "（保留）" else ""} ${time("dateModified")}\n${if (captureOnly) "建议拍摄时间" else "建议统一时间"} ${time("target")}\n${File(row.getString("localFile")).parent}"
                 isChecked = id in chosen
                 isEnabled = !busy && !BackupOperationGuard.hasGalleryState(this@GalleryRepairActivity)
                 setOnCheckedChangeListener { _, checked -> if (checked) chosen.add(id) else chosen.remove(id); updateActions() }

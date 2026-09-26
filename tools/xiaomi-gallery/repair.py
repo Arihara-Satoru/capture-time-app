@@ -29,7 +29,10 @@ def main():
     group.add_argument("--apply-plan", type=Path)
     group.add_argument("--verify-plan", type=Path)
     group.add_argument("--check", action="store_true", help="test transaction rollback in a disposable database")
+    parser.add_argument("--capture-only", action="store_true", help="plan only capture-time changes and preserve Gallery's added time")
     args = parser.parse_args()
+    if args.capture_only and (args.apply_plan or args.verify_plan or args.check):
+        parser.error("--capture-only is only for generating a plan; apply and verify use the plan's saved mode")
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     adb_path = shutil.which("adb")
@@ -107,6 +110,9 @@ def main():
         if not rows:
             raise RuntimeError("The rollback check needs one currently eligible row")
         row = rows[0]
+        row["dateTaken"] = row["target"] + 3 * 86400000
+        row["mixedDateTime"] = row["dateTaken"]
+        row["dateModified"] = row["target"] + 5 * 86400000
         fields = [k for k in row if k not in ("target", "targetExif")]
         test_db = output / "test.db"
         with sqlite3.connect(test_db) as db:
@@ -131,6 +137,20 @@ def main():
             assert tuple(row[k] for k in fields) == actual, "Transaction did not roll back"
             assert db.execute("PRAGMA quick_check").fetchone()[0] == "ok"
         print("ROLLBACK_CHECK_OK", flush=True)
+        capture_plan = output / "test-capture-plan.json"
+        capture_plan.write_text(json.dumps([dict(row, repairMode="capture")]), encoding="utf-8")
+        remote_capture_plan = "/data/local/tmp/" + output.name + "-capture.json"
+        push(capture_plan, remote_capture_plan)
+        invoke("apply " + remote_capture_plan, remote_db)
+        invoke("verify " + remote_capture_plan, remote_db)
+        run(adb + ["pull", remote_db, str(output / "test-after-capture.db")])
+        with sqlite3.connect(output / "test-after-capture.db") as db:
+            taken, mixed, added, exif = db.execute(
+                "SELECT dateTaken,mixedDateTime,dateModified,exifDateTime FROM cloud").fetchone()
+            assert (taken, mixed, added, exif) == (
+                row["target"], row["target"], row["dateModified"], row["targetExif"])
+            assert db.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        print("CAPTURE_ONLY_CHECK_OK", flush=True)
         return
 
     if args.verify_plan:
@@ -168,7 +188,11 @@ def main():
             values = {e.attrib["name"]: int(e.attrib["value"]) for e in settings if e.tag == "int"}
             tolerance = sum(values.get(k, 0) * scale for k, scale in (("days", 86400), ("hours", 3600), ("minutes", 60), ("seconds", 1))) * 1000
             rows = json.loads(invoke("plan"))
-            rows = [r for r in rows if max(abs((r.get(k) or 0) - r["target"]) for k in ("dateTaken", "mixedDateTime", "dateModified")) > tolerance]
+            fields = ("dateTaken", "mixedDateTime") if args.capture_only else ("dateTaken", "mixedDateTime", "dateModified")
+            rows = [r for r in rows if max(abs((r.get(k) or 0) - r["target"]) for k in fields) > tolerance]
+            if args.capture_only:
+                for row in rows:
+                    row["repairMode"] = "capture"
             (output / "plan.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
             print("Eligible:", len(rows), "Tolerance milliseconds:", tolerance, "Plan:", output / "plan.json", flush=True)
     finally:
