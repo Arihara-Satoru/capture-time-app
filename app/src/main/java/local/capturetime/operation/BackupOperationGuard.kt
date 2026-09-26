@@ -9,6 +9,7 @@ object BackupOperationGuard {
     private const val CAPTURE_ACTIVE_FILE = "capture-time-active"
     private const val DUPLICATE_ACTIVE_FILE = "duplicate-delete-active"
     private const val DUPLICATE_PENDING_FILE = "pending-duplicate-delete.json"
+    private const val GALLERY_ACTIVE_FILE = "gallery-repair-active"
     private val lock = Any()
 
     @Volatile private var captureActiveInProcess = false
@@ -20,6 +21,7 @@ object BackupOperationGuard {
             check(!captureActiveInProcess) { "另一项拍摄时间操作仍在进行" }
             check(!atomicFileExists(captureMarker(context))) { "存在上次中断的拍摄时间会话，请先检查备份并解除锁定" }
             check(!hasDuplicateState(context)) { "重复删除仍在准备、确认或核验" }
+            check(!hasGalleryState(context)) { "小米相册修复仍在进行或等待核验" }
             val session = createSession()
             writeMarker(captureMarker(context), sessionDirectory(session).absolutePath)
             captureActiveInProcess = true
@@ -51,6 +53,7 @@ object BackupOperationGuard {
             "拍摄时间操作仍在进行或存在中断恢复会话"
         }
         check(!hasDuplicateState(context)) { "另一项重复删除仍在进行" }
+        check(!hasGalleryState(context)) { "小米相册修复仍在进行或等待核验" }
         val session = createSession()
         writeMarker(duplicateMarker(context), session.absolutePath)
         session
@@ -66,8 +69,19 @@ object BackupOperationGuard {
 
     fun isCleanupBlocked(context: Context): Boolean = synchronized(lock) {
         captureActiveInProcess || atomicFileExists(captureMarker(context)) ||
-            atomicFileExists(duplicatePending(context)) || atomicFileExists(duplicateMarker(context))
+            atomicFileExists(duplicatePending(context)) || atomicFileExists(duplicateMarker(context)) || hasGalleryState(context)
     }
+
+    fun beginGallery(context: Context, createSession: () -> File): File = synchronized(lock) {
+        check(!isCleanupBlocked(context)) { "照片操作仍在进行或等待恢复，请先完成当前会话" }
+        val session = createSession()
+        writeMarker(galleryMarker(context), session.absolutePath)
+        session
+    }
+
+    fun hasGalleryState(context: Context): Boolean = synchronized(lock) { atomicFileExists(galleryMarker(context)) }
+    fun galleryRecoverySession(context: Context): String? = synchronized(lock) { readMarker(galleryMarker(context)) }
+    fun endGallery(context: Context, session: File) = synchronized(lock) { clearMatchingMarker(galleryMarker(context), session) }
 
     fun runCleanupIfAllowed(context: Context, action: () -> Unit): Boolean = synchronized(lock) {
         if (isCleanupBlocked(context)) false else {
@@ -79,6 +93,7 @@ object BackupOperationGuard {
     private fun captureMarker(context: Context) = AtomicFile(File(context.filesDir, CAPTURE_ACTIVE_FILE))
     private fun duplicateMarker(context: Context) = AtomicFile(File(context.filesDir, DUPLICATE_ACTIVE_FILE))
     private fun duplicatePending(context: Context) = AtomicFile(File(context.filesDir, DUPLICATE_PENDING_FILE))
+    private fun galleryMarker(context: Context) = AtomicFile(File(context.filesDir, GALLERY_ACTIVE_FILE))
 
     private fun writeMarker(file: AtomicFile, value: String) {
         var stream: FileOutputStream? = null

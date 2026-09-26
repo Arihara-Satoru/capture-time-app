@@ -115,6 +115,9 @@ class MainActivity : Activity() {
         scanButton.setOnClickListener { scanAllPhotos() }
         trialButton.setOnClickListener { confirmTrial() }
         batchButton.setOnClickListener { confirmBatch() }
+        findViewById<Button>(R.id.galleryRootEntry).setOnClickListener {
+            startActivity(Intent(this, local.capturetime.gallery.GalleryRepairActivity::class.java))
+        }
         duplicateScanButton.setOnClickListener { scanDuplicates() }
         duplicateDeleteButton.setOnClickListener {
             if (duplicateOperationActive.get()) {
@@ -666,6 +669,11 @@ class MainActivity : Activity() {
     }
 
     private fun updateDuplicateActions() {
+        if (BackupOperationGuard.hasGalleryState(applicationContext)) {
+            duplicateDeleteButton.isEnabled = false
+            duplicateDeleteButton.text = "小米相册修复待核验"
+            return
+        }
         if (BackupOperationGuard.hasCaptureRecoveryState(applicationContext)) {
             duplicateDeleteButton.isEnabled = false
             duplicateDeleteButton.text = "拍摄时间会话待检查"
@@ -782,7 +790,9 @@ class MainActivity : Activity() {
 
     private fun updateActions() {
         val granted = hasStorageAccess()
-        val recoveryBlocked = BackupOperationGuard.hasCaptureRecoveryState(applicationContext)
+        val recoveryBlocked = BackupOperationGuard.hasCaptureRecoveryState(applicationContext) || BackupOperationGuard.hasGalleryState(applicationContext)
+        findViewById<Button>(R.id.galleryRootEntry).text = if (BackupOperationGuard.hasGalleryState(applicationContext))
+            "核验小米相册修复 · Root" else "小米相册时间修复 · Root"
         trialButton.isEnabled = granted && !recoveryBlocked && selected?.candidate == true && selected?.safeForTrial == true
         batchButton.isEnabled = granted && !recoveryBlocked && jpegTrialPassed && records.any { it.file.absolutePath !in completedPaths && it.candidate && it.safeForTrial && (it.format == ImageFormat.JPEG || it.format in unlockedFormats) }
     }

@@ -9,7 +9,7 @@
         android:allowBackup="false"
         android:icon="@drawable/app_icon"
         android:roundIcon="@drawable/app_icon"
-        android:label="拍摄时间修正"
+        android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
@@ -21,5 +21,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".settings.SettingsActivity" android:exported="false" />
+        <activity android:name=".gallery.GalleryRepairActivity" android:exported="false" />
     </application>
 </manifest>

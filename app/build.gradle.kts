@@ -11,8 +11,9 @@ android {
         applicationId = "local.capturetime"
         minSdk = 30
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.4.8"
+        versionCode = 21
+        versionName = "1.5.0"
+        manifestPlaceholders["appLabel"] = "拍摄时间修正"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -21,6 +22,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "拍摄时间修正 · 测试"
         }
         release {
             isMinifyEnabled = false

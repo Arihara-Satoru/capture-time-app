@@ -152,7 +152,7 @@ class SettingsActivity : Activity() {
 
     private fun confirmClearBackups() {
         if (DuplicateDeleteProcessor.isBackupCleanupBlocked(this)) {
-            Toast.makeText(this, "重复删除仍在准备、确认或核验，不能清除备份", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "照片操作或相册修复仍在进行或等待核验，不能清除备份", Toast.LENGTH_LONG).show()
             return
         }
         val sessions = backupSessions()
@@ -179,7 +179,7 @@ class SettingsActivity : Activity() {
             }
         }
         if (!allowed) {
-            Toast.makeText(this, "重复删除状态已变化，未清除任何备份", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "照片操作状态已变化，未清除任何备份", Toast.LENGTH_LONG).show()
             return
         }
         val message = if (failed == 0) "已清除 $removed 个备份会话目录" else "已清除 $removed 个目录，$failed 个目录清除失败"

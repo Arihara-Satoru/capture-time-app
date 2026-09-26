@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:fitsSystemWindows="true" android:background="?attr/colorSurface">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/galleryRootToolbar" android:layout_width="match_parent" android:layout_height="?attr/actionBarSize"
+        app:navigationIcon="@drawable/ic_back" app:navigationContentDescription="返回"
+        app:title="小米相册时间修复" app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:paddingHorizontal="16dp" android:orientation="vertical">
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+            app:cardCornerRadius="20dp" app:cardElevation="0dp" app:cardBackgroundColor="?attr/colorPrimaryContainer">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="照片时间正确，相册仍显示旧日期？" android:textStyle="bold"
+                    android:textAppearance="@style/TextAppearance.Material3.TitleMedium" android:textColor="?attr/colorOnPrimaryContainer" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                    android:text="使用 Root 修正小米相册保存的时间。仅在文件名、EXIF 原始时间和文件修改时间一致时生成建议，执行前自动备份。"
+                    android:textAppearance="@style/SupportingText" android:textColor="?attr/colorOnPrimaryContainer" />
+                <TextView android:id="@+id/galleryRootStatus" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp" android:text="尚未请求 Root 授权" android:textStyle="bold"
+                    android:textAppearance="@style/TextAppearance.Material3.LabelLarge" android:textColor="?attr/colorOnPrimaryContainer" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/galleryRootScan" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:minHeight="48dp" android:text="授权 Root 并检查" app:icon="@drawable/ic_scan" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView android:id="@+id/galleryRootSummary" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="14dp" android:text="检查后可对照相册旧时间与建议时间。" android:textAppearance="@style/SupportingText"
+            android:accessibilityLiveRegion="polite" />
+        <ProgressBar android:id="@+id/galleryRootProgress" style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="4dp" android:indeterminate="true" android:visibility="gone"
+            android:contentDescription="正在检查或修复小米相册时间" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/galleryRootSelectAll" style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="全选" android:minHeight="48dp" android:enabled="false" />
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/galleryRootList" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+            android:clipToPadding="false" android:paddingBottom="8dp" android:contentDescription="小米相册时间修复候选" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/galleryRootRecovery" style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
+            android:text="核验上次会话" android:visibility="gone" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/galleryRootRepair" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:minHeight="48dp" android:text="修复所选时间" android:enabled="false" app:icon="@drawable/ic_shield" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/galleryRootLogs" style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
+            android:text="会话记录与备份" />
+    </LinearLayout>
+</LinearLayout>
