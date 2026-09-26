@@ -6,7 +6,7 @@
 
 这个工具使用手机现有的 root 权限，复用已安装的 `local.capturetime` 应用的 `CaptureTimeParser`，通过 Android 自带的 SQLite 和 EXIF API 处理相册记录。无需安装 sqlite3 或常驻模块。
 
-v1.5.2 也可直接从应用首页进入“小米相册时间修复 · Root”，选择统一两种排序时间或只修拍摄时间。界面与这个脚本共用 `app/src/main/java/local/capturetime/gallery/GalleryTimeRepair.java`，应用内备份可导出 ZIP。
+v1.5.3 也可直接从应用首页进入“小米相册时间修复 · Root”，选择统一两种排序时间或只修拍摄时间。界面与这个脚本共用 `app/src/main/java/local/capturetime/gallery/GalleryTimeRepair.java`，应用内备份可导出 ZIP。
 
 ## 使用
 

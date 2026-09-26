@@ -41,8 +41,11 @@ public final class GalleryTimeRepair {
         if (!matchesFileName(recordedName, name, r.getLong("localFlag"))) return null;
         int dot = name.lastIndexOf('.');
         Instant named = PARSER.parseFilename(dot < 0 ? name : name.substring(0, dot));
-        int recordedDot = recordedName.lastIndexOf('.');
-        Instant recorded = PARSER.parseFilename(recordedDot < 0 ? recordedName : recordedName.substring(0, recordedDot));
+        // ponytail: Gallery sometimes appends an upload millisecond ID only in its database name;
+        // compare the validated on-disk prefix because parsing that ID as a second date is ambiguous.
+        String timeName = recordedName.length() > name.length() ? name : recordedName;
+        int recordedDot = timeName.lastIndexOf('.');
+        Instant recorded = PARSER.parseFilename(recordedDot < 0 ? timeName : timeName.substring(0, recordedDot));
         if (named == null || !named.equals(recorded)) return null;
         Instant original;
         try (java.io.FileInputStream stream = new java.io.FileInputStream(file)) {
@@ -59,6 +62,11 @@ public final class GalleryTimeRepair {
     static boolean matchesFileName(String recorded, String actual, long localFlag) {
         if (actual.equals(recorded)) return true;
         int dot = recorded.lastIndexOf('.');
+        int actualDot = actual.lastIndexOf('.');
+        if (localFlag == 0 && actualDot > 0 && dot == actualDot + 14
+            && recorded.startsWith(actual.substring(0, actualDot) + "_")
+            && recorded.endsWith(actual.substring(actualDot))
+            && recorded.substring(actualDot + 1, dot).matches("[0-9]{13}")) return true;
         // ponytail: only Gallery's observed six-hex copy suffix is accepted for localFlag 7;
         // other renames need manual review before widening the rule.
         return localFlag == 7 && dot > 0 && actual.length() == recorded.length() + 7
