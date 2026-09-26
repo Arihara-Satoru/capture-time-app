@@ -16,7 +16,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class GalleryRepair(private val context: Context) {
-    data class Preview(val rows: List<JSONObject>, val inspected: Int)
+    data class Preview(val rows: List<JSONObject>, val inspected: Int, val cloudOnly: Int)
 
     fun scan(rule: TimeRuleConfig): Preview {
         check(!BackupOperationGuard.isCleanupBlocked(context)) { "请先完成正在进行或等待核验的照片操作" }
@@ -24,11 +24,15 @@ class GalleryRepair(private val context: Context) {
         val parsed = JSONArray(result.first)
         val rows = (0 until parsed.length()).map(parsed::getJSONObject).filter { row ->
             val target = Instant.ofEpochMilli(row.getLong("target"))
-            listOf("dateTaken", "mixedDateTime").any { field ->
+            listOf("dateTaken", "mixedDateTime", "dateModified").any { field ->
                 rule.needsChange(if (row.isNull(field)) null else Instant.ofEpochMilli(row.getLong(field)), target)
             }
         }
-        return Preview(rows, Regex("Inspected=(\\d+)").find(result.second)?.groupValues?.get(1)?.toIntOrNull() ?: parsed.length())
+        return Preview(
+            rows,
+            Regex("Inspected=(\\d+)").find(result.second)?.groupValues?.get(1)?.toIntOrNull() ?: parsed.length(),
+            Regex("CloudOnly=(\\d+)").find(result.second)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        )
     }
 
     fun repair(rows: List<JSONObject>, progress: (String) -> Unit): File {

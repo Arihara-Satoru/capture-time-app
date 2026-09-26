@@ -37,10 +37,13 @@ public final class GalleryTimeRepair {
         if (!file.getCanonicalPath().equals(path)) throw new IllegalStateException("Canonical path differs: " + file.getCanonicalPath());
         if (r.getLong("localFlag") != 0 && r.getLong("localFlag") != 7 && r.getLong("localFlag") != 8) return null;
         String name = file.getName();
-        if (!name.equals(r.getString("fileName"))) return null;
+        String recordedName = r.getString("fileName");
+        if (!matchesFileName(recordedName, name, r.getLong("localFlag"))) return null;
         int dot = name.lastIndexOf('.');
         Instant named = PARSER.parseFilename(dot < 0 ? name : name.substring(0, dot));
-        if (named == null) return null;
+        int recordedDot = recordedName.lastIndexOf('.');
+        Instant recorded = PARSER.parseFilename(recordedDot < 0 ? recordedName : recordedName.substring(0, recordedDot));
+        if (named == null || !named.equals(recorded)) return null;
         Instant original;
         try (java.io.FileInputStream stream = new java.io.FileInputStream(file)) {
             ExifInterface exif = new ExifInterface(stream);
@@ -51,6 +54,17 @@ public final class GalleryTimeRepair {
         if (original == null || original.getEpochSecond() != named.getEpochSecond()
             || Math.floorDiv(file.lastModified(), 1000L) != original.getEpochSecond()) return null;
         return original.toEpochMilli();
+    }
+
+    static boolean matchesFileName(String recorded, String actual, long localFlag) {
+        if (actual.equals(recorded)) return true;
+        int dot = recorded.lastIndexOf('.');
+        // ponytail: only Gallery's observed six-hex copy suffix is accepted for localFlag 7;
+        // other renames need manual review before widening the rule.
+        return localFlag == 7 && dot > 0 && actual.length() == recorded.length() + 7
+            && actual.startsWith(recorded.substring(0, dot) + "_")
+            && actual.endsWith(recorded.substring(dot))
+            && actual.substring(dot + 1, dot + 7).matches("[0-9a-f]{6}");
     }
 
     public static void main(String[] args) {
@@ -82,6 +96,11 @@ public final class GalleryTimeRepair {
             if (args[0].equals("plan")) {
                 JSONArray plan = new JSONArray();
                 int inspected = 0;
+                int cloudOnly = 0;
+                if (args.length == 1) try (Cursor count = db.rawQuery(
+                        "SELECT COUNT(*) FROM cloud WHERE serverType=1 AND localFile IS NULL", null)) {
+                    if (count.moveToFirst()) cloudOnly = count.getInt(0);
+                }
                 String where = "serverType=1 AND localFile IS NOT NULL";
                 String[] values = null;
                 if (args.length == 2) { where += " AND _id=?"; values = new String[]{Long.toString(Long.parseLong(args[1]))}; }
@@ -100,7 +119,7 @@ public final class GalleryTimeRepair {
                         plan.put(r);
                     }
                 }
-                System.err.println("Inspected=" + inspected + " eligible=" + plan.length());
+                System.err.println("Inspected=" + inspected + " CloudOnly=" + cloudOnly + " eligible=" + plan.length());
                 System.out.println(plan.toString(2));
                 return;
             }

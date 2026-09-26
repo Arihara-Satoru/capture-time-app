@@ -168,7 +168,7 @@ def main():
             values = {e.attrib["name"]: int(e.attrib["value"]) for e in settings if e.tag == "int"}
             tolerance = sum(values.get(k, 0) * scale for k, scale in (("days", 86400), ("hours", 3600), ("minutes", 60), ("seconds", 1))) * 1000
             rows = json.loads(invoke("plan"))
-            rows = [r for r in rows if max(abs((r.get(k) or 0) - r["target"]) for k in ("dateTaken", "mixedDateTime")) > tolerance]
+            rows = [r for r in rows if max(abs((r.get(k) or 0) - r["target"]) for k in ("dateTaken", "mixedDateTime", "dateModified")) > tolerance]
             (output / "plan.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
             print("Eligible:", len(rows), "Tolerance milliseconds:", tolerance, "Plan:", output / "plan.json", flush=True)
     finally:

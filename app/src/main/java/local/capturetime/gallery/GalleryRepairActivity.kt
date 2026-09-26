@@ -82,8 +82,13 @@ class GalleryRepairActivity : Activity() {
             rows = preview.rows
             status.text = "Root 已授权 · 检查完成"
             findViewById<Button>(R.id.galleryRootScan).text = "重新检查"
-            summary.text = "已检查 ${preview.inspected} 张 · 符合修复条件 ${rows.size} 张\n" +
-                if (rows.isEmpty()) "当前没有超过忽略误差、且三项时间来源一致的待修复照片。" else "勾选照片后，可备份并修复相册显示时间。"
+            val rule = TimeRuleConfig.load(applicationContext)
+            fun differs(row: JSONObject, field: String): Boolean = rule.needsChange(
+                if (row.isNull(field)) null else Instant.ofEpochMilli(row.getLong(field)), Instant.ofEpochMilli(row.getLong("target")))
+            val capture = rows.count { differs(it, "dateTaken") || differs(it, "mixedDateTime") }
+            val added = rows.count { differs(it, "dateModified") }
+            summary.text = "已检查有本地路径 ${preview.inspected} 张 · 云端无原图 ${preview.cloudOnly} 张待核对\n拍摄排序待修 $capture 张 · 添加排序待修 $added 张\n" +
+                if (rows.isEmpty()) "当前没有超过忽略误差、且文件名、EXIF、文件修改时间一致的待修复照片。" else "两种排序均按可靠拍摄时间修正。勾选照片后先备份，再修复相册时间。"
             listAdapter.notifyDataSetChanged()
         }
     }
@@ -197,7 +202,7 @@ class GalleryRepairActivity : Activity() {
             fun time(key: String) = CaptureTimeParser.formatDisplay(if (row.isNull(key)) null else Instant.ofEpochMilli(row.getLong(key)))
             holder.check.apply {
                 setOnCheckedChangeListener(null)
-                text = "${row.getString("fileName")}\n相册时间 ${time("dateTaken")}\n排序时间 ${time("mixedDateTime")}\n建议时间 ${time("target")}\n${File(row.getString("localFile")).parent}"
+                text = "${row.getString("fileName")}\n拍摄排序 ${time("dateTaken")}\n添加排序 ${time("dateModified")}\n建议时间 ${time("target")}\n${File(row.getString("localFile")).parent}"
                 isChecked = id in chosen
                 isEnabled = !busy && !BackupOperationGuard.hasGalleryState(this@GalleryRepairActivity)
                 setOnCheckedChangeListener { _, checked -> if (checked) chosen.add(id) else chosen.remove(id); updateActions() }

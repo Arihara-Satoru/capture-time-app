@@ -6,7 +6,7 @@
 
 这个工具使用手机现有的 root 权限，复用已安装的 `local.capturetime` 应用的 `CaptureTimeParser`，通过 Android 自带的 SQLite 和 EXIF API 处理相册记录。无需安装 sqlite3 或常驻模块。
 
-v1.5.0 也可直接从应用首页进入“小米相册时间修复 · Root”。界面与这个脚本共用 `app/src/main/java/local/capturetime/gallery/GalleryTimeRepair.java`，应用内备份可导出 ZIP。
+v1.5.1 也可直接从应用首页进入“小米相册时间修复 · Root”。界面与这个脚本共用 `app/src/main/java/local/capturetime/gallery/GalleryTimeRepair.java`，应用内备份可导出 ZIP。
 
 ## 使用
 
@@ -31,7 +31,7 @@ python tools/xiaomi-gallery/repair.py --serial "你的ADB序列号" --check
 ## 修复边界与核验
 
 - 清单仅选择文件名时间、EXIF 原始时间、文件修改时间一致到秒的本地照片；文件路径、文件名、同步状态也必须满足检查。
-- 沿用应用设置中“忽略误差”的阈值，仅修复相册拍摄或排序时间超过该误差的条目。无可靠文件名、来源冲突、视频和仅在云端的照片不自动处理。
+- 沿用应用设置中“忽略误差”的阈值，分别检查相册拍摄排序和添加排序时间，仅修复超过该误差的条目；修复添加排序会将其对齐可靠拍摄时间。无可靠文件名、来源冲突、视频和仅在云端的照片不自动处理。
 - 操作前暂停相册，保存 `gallery.db`、首页缓存库和辅助库的完整备份及 WAL，并核验手机与电脑备份的 SHA-256。
 - 在一个事务中核对每条记录的旧值并重读文件依据，再更新 `dateTaken`、`mixedDateTime`、`dateModified`、`exifDateTime`。任一条记录变化，整批回滚，需重新生成清单。
 - 修复后重读全部条目，检查数据库完整性；照片原文件的 SHA-256 必须保持不变。恢复数据库文件权限并重启相册，再核验一次。
