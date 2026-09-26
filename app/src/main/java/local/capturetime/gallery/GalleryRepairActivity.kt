@@ -3,10 +3,16 @@ package local.capturetime.gallery
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
+import android.media.ThumbnailUtils
 import android.os.Bundle
+import android.util.LruCache
+import android.util.Size
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.RadioGroup
 import android.widget.TextView
@@ -79,7 +85,7 @@ class GalleryRepairActivity : Activity() {
         updateActions()
     }
 
-    override fun onDestroy() { executor.shutdown(); super.onDestroy() }
+    override fun onDestroy() { executor.shutdown(); listAdapter.close(); super.onDestroy() }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("export_session", exportSession?.path)
         outState.putBoolean("include_added", includeAdded)
@@ -206,26 +212,58 @@ class GalleryRepairActivity : Activity() {
     }
 
     private inner class CandidateAdapter : RecyclerView.Adapter<CandidateAdapter.Holder>() {
-        inner class Holder(val check: MaterialCheckBox) : RecyclerView.ViewHolder(check)
+        private val thumbnails = LruCache<String, Bitmap>(48)
+        private val thumbnailExecutor = Executors.newFixedThreadPool(2)
+        inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
+            val preview: ImageView = view.findViewById(R.id.galleryCandidatePreview)
+            val check: MaterialCheckBox = view.findViewById(R.id.galleryCandidateCheck)
+        }
+        fun close() = thumbnailExecutor.shutdownNow()
         override fun getItemCount() = rows.size
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = Holder(MaterialCheckBox(parent.context).apply {
-            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            val padding = (12 * resources.displayMetrics.density).toInt()
-            setPadding(padding, padding, padding, padding)
-            textSize = 14f
-            minHeight = (96 * resources.displayMetrics.density).toInt()
-        })
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+            Holder(LayoutInflater.from(parent.context).inflate(R.layout.item_gallery_repair, parent, false))
         override fun onBindViewHolder(holder: Holder, position: Int) {
             val row = rows[position]; val id = row.getLong("_id")
+            val file = File(row.getString("localFile"))
+            val key = "${file.path}:${file.lastModified()}:${file.length()}"
+            val cached = thumbnails.get(key)
+            holder.preview.apply {
+                tag = key
+                contentDescription = "查看 ${file.name} 的照片预览"
+                if (cached == null) setImageResource(android.R.drawable.ic_menu_gallery) else setImageBitmap(cached)
+                setOnClickListener { showPreview(file) }
+            }
+            if (cached == null) thumbnailExecutor.execute {
+                val bitmap = runCatching { ThumbnailUtils.createImageThumbnail(file, Size(184, 184), null) }.getOrNull()
+                if (bitmap != null) {
+                    thumbnails.put(key, bitmap)
+                    holder.preview.post { if (holder.preview.tag == key) holder.preview.setImageBitmap(bitmap) }
+                }
+            }
             fun time(key: String) = CaptureTimeParser.formatDisplay(if (row.isNull(key)) null else Instant.ofEpochMilli(row.getLong(key)))
             holder.check.apply {
                 setOnCheckedChangeListener(null)
                 val captureOnly = row.optString("repairMode") == "capture"
-                text = "${row.getString("fileName")}\n拍摄排序 ${time("dateTaken")}\n添加排序${if (captureOnly) "（保留）" else ""} ${time("dateModified")}\n${if (captureOnly) "建议拍摄时间" else "建议统一时间"} ${time("target")}\n${File(row.getString("localFile")).parent}"
+                text = "${file.name}\n拍摄排序 ${time("dateTaken")}\n添加排序${if (captureOnly) "（保留）" else ""} ${time("dateModified")}\n${if (captureOnly) "建议拍摄时间" else "建议统一时间"} ${time("target")}\n${file.parent}"
                 isChecked = id in chosen
                 isEnabled = !busy && !BackupOperationGuard.hasGalleryState(this@GalleryRepairActivity)
                 setOnCheckedChangeListener { _, checked -> if (checked) chosen.add(id) else chosen.remove(id); updateActions() }
             }
+        }
+    }
+
+    private fun showPreview(file: File) {
+        val image = ImageView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (resources.displayMetrics.heightPixels * 0.55f).toInt())
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setImageResource(android.R.drawable.ic_menu_gallery)
+            contentDescription = "${file.name} 的放大预览"
+        }
+        val dialog = MaterialAlertDialogBuilder(this).setTitle("照片预览").setMessage(file.name)
+            .setView(image).setPositiveButton("关闭", null).show()
+        executor.execute {
+            val bitmap = runCatching { ThumbnailUtils.createImageThumbnail(file, Size(1080, 1080), null) }.getOrNull()
+            image.post { if (dialog.isShowing && bitmap != null) image.setImageBitmap(bitmap) }
         }
     }
 }

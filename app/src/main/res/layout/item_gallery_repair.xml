@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/card_photo"
+    android:gravity="center_vertical"
+    android:minHeight="112dp"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/galleryCandidatePreview"
+        android:layout_width="88dp"
+        android:layout_height="88dp"
+        android:contentDescription="查看照片预览"
+        android:clickable="true"
+        android:focusable="true"
+        android:scaleType="centerCrop"
+        android:src="@android:drawable/ic_menu_gallery"
+        app:shapeAppearanceOverlay="@style/PhotoThumbnailShape" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/galleryCandidateCheck"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:minHeight="96dp"
+        android:padding="4dp"
+        android:textSize="14sp" />
+</LinearLayout>
