@@ -99,7 +99,13 @@ object DuplicateRules {
             val prefix = copyStem.substring(0, underscore)
             val matches = byStem[prefix.lowercase(Locale.ROOT)].orEmpty()
                 .filter { it.file.absolutePath != copy.file.absolutePath }
-            val original = matches.firstOrNull { stem(it) == prefix && extension(it) == extension(copy) }
+            val hexOriginal = hexCopyBase(copyStem)?.let { base ->
+                byStem[base.lowercase(Locale.ROOT)].orEmpty().singleOrNull {
+                    extension(it) == extension(copy) && aspectDifference(it, copy) < 0.003
+                }
+            }
+            val original = hexOriginal
+                ?: matches.firstOrNull { stem(it) == prefix && extension(it) == extension(copy) }
                 ?: matches.filter { extension(it) == extension(copy) }.singleOrNull()
                 ?: matches.singleOrNull()
                 ?: return@mapNotNull null
@@ -112,7 +118,9 @@ object DuplicateRules {
             DuplicateCandidate(
                 delete = delete,
                 retained = retained,
-                reason = "文件名前缀“$prefix”与同目录图片匹配；内容可能不同，默认保留像素较多或同分辨率下较大的文件，请比对后确认",
+                reason = if (hexOriginal != null)
+                    "同目录原名与 6 位十六进制副本名匹配、画面比例一致；内容可能不同，默认保留像素较多或同分辨率下较大的文件，请比对后确认"
+                else "文件名前缀“$prefix”与同目录图片匹配；内容可能不同，默认保留像素较多或同分辨率下较大的文件，请比对后确认",
                 matchedByNameRule = true
             )
         }
@@ -161,8 +169,20 @@ object DuplicateRules {
         if (directoryKey(candidate.delete) != directoryKey(candidate.retained)) return false
         return isPrefixPair(candidate.delete, candidate.retained) ||
             isPrefixPair(candidate.retained, candidate.delete) ||
+            isHexOriginalPair(candidate.delete, candidate.retained) ||
+            isHexOriginalPair(candidate.retained, candidate.delete) ||
             isNumericHexPair(candidate.delete, candidate.retained) ||
             isNumericHexPair(candidate.retained, candidate.delete)
+    }
+
+    private fun isHexOriginalPair(copy: DuplicateAsset, original: DuplicateAsset): Boolean =
+        hexCopyBase(stem(copy))?.equals(stem(original), ignoreCase = true) == true &&
+            extension(copy) == extension(original) && aspectDifference(copy, original) < 0.003
+
+    private fun hexCopyBase(name: String): String? {
+        val match = hexCopy.matchEntire(name) ?: return null
+        // ponytail: require A-F in generic suffixes; all-digit endings can be screenshot times.
+        return match.groupValues[1].takeIf { match.groupValues[2].any(Char::isLetter) }
     }
 
     private fun isPrefixPair(copy: DuplicateAsset, original: DuplicateAsset): Boolean {

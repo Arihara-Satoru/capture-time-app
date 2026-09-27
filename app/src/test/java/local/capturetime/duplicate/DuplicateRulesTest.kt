@@ -22,6 +22,17 @@ class DuplicateRulesTest {
         assertTrue(DuplicateRules.findCandidates(files).isEmpty())
     }
 
+    @Test fun `screenshot hex copy with different bytes retains higher resolution`() {
+        val base = "/Pictures/Gallery/owner/galgame/Screenshot_2023-07-02-21-33-08-904_org.tvp.kirikiri2_free_10309"
+        val original = image("$base.jpg", 121947, 1728, 1080).copy(sha256 = "lower")
+        val copy = image("${base}_17b2ad.jpg", 1259816, 2560, 1600).copy(sha256 = "higher")
+        val candidate = DuplicateRules.findCandidates(listOf(original, copy)).single()
+        assertEquals(original.file, candidate.delete.file)
+        assertEquals(copy.file, candidate.retained.file)
+        assertTrue(DuplicateRules.isEligibleCandidate(candidate))
+        assertTrue(DuplicateRules.findCandidates(listOf(original, copy.copy(height = 1500))).isEmpty())
+    }
+
     @Test fun `numeric and bracket copies require original`() {
         val noOriginal = listOf(image("/DCIM/a_1234567890123.jpg", 90), image("/DCIM/a (1).jpg", 80))
         assertTrue(DuplicateRules.findCandidates(noOriginal).isEmpty())

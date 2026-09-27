@@ -30,7 +30,7 @@ class DuplicateDeleteProcessor(
             "所选候选存在保留文件同时被删除的依赖冲突，请减少勾选数量后重试"
         }
         require(candidates.all(DuplicateRules::isEligibleCandidate)) {
-            "候选已不符合内容哈希或下划线文件名前缀规则，请重新扫描"
+            "候选已不符合内容哈希或文件名关联规则，请重新扫描"
         }
         val storage = Environment.getExternalStorageDirectory()
         val session = BackupOperationGuard.beginDuplicate(context) { createSession(storage) }
