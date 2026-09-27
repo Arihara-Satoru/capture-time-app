@@ -80,7 +80,7 @@ class GalleryRepairActivity : Activity() {
             summary.text = "发现尚未完成核验的相册修复。请先核验上次会话，备份将继续保留。"
         } else {
             val tolerance = TimeRuleConfig.load(this).toleranceSeconds
-            summary.text = "沿用设置：忽略 ${tolerance / 86400} 天 ${tolerance / 3600 % 24} 时 ${tolerance / 60 % 60} 分 ${tolerance % 60} 秒误差。检查完成后，勾选需要修复的照片。"
+            summary.text = "忽略 ${tolerance / 86400} 天 ${tolerance / 3600 % 24} 时 ${tolerance / 60 % 60} 分 ${tolerance % 60} 秒误差。检查后勾选照片。"
         }
         updateActions()
     }
@@ -108,8 +108,8 @@ class GalleryRepairActivity : Activity() {
             val capture = rows.count { differs(it, "dateTaken") || differs(it, "mixedDateTime") }
             val modeSummary = if (scanAdded) "拍摄排序待修 $capture 张 · 添加排序待修 ${rows.count { differs(it, "dateModified") }} 张"
                 else "拍摄排序待修 $capture 张 · 添加排序保持原值"
-            summary.text = "已检查有本地路径 ${preview.inspected} 张 · 云端无原图 ${preview.cloudOnly} 张待核对\n$modeSummary\n" +
-                if (rows.isEmpty()) "当前没有超过忽略误差、且文件名、EXIF、文件修改时间一致的待修复照片。" else "勾选照片后先备份，再按所选模式修复相册时间。"
+            summary.text = "已检查本地 ${preview.inspected} 张 · 云端无原图 ${preview.cloudOnly} 张待核对\n$modeSummary\n" +
+                if (rows.isEmpty()) "暂无符合条件的待修照片。" else "勾选后自动备份并修复。"
             listAdapter.notifyDataSetChanged()
         }
     }

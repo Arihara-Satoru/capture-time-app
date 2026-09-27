@@ -92,7 +92,6 @@ class MainActivity : Activity() {
     private val correctExtensionButton by lazy { findViewById<Button>(R.id.correctExtensionButton) }
     private val scanProgress by lazy { findViewById<ProgressBar>(R.id.scanProgress) }
     private val scanSummary by lazy { findViewById<TextView>(R.id.scanSummary) }
-    private val accessStatus by lazy { findViewById<TextView>(R.id.accessStatus) }
     private val resultText by lazy { findViewById<TextView>(R.id.resultText) }
     private val duplicateScanButton by lazy { findViewById<Button>(R.id.duplicateScanButton) }
     private val duplicateDeleteButton by lazy { findViewById<Button>(R.id.duplicateDeleteButton) }
@@ -109,7 +108,10 @@ class MainActivity : Activity() {
         exif = ExifGateway()
         reloadTimeRule()
         snapshotStore = ScanSnapshotStore(this)
-        adapter = PhotoAdapter { record -> selected = record; updateActions() }
+        adapter = PhotoAdapter(
+            onSelected = { record -> selected = record; updateActions() },
+            onPreview = { record -> showPhotoPreview(record.file) },
+        )
         duplicateAdapter = DuplicateAdapter(::updateDuplicateActions, ::showDuplicateComparison)
         findViewById<RecyclerView>(R.id.photoList).apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
@@ -266,8 +268,6 @@ class MainActivity : Activity() {
 
     private fun updatePermissionState() {
         val granted = hasStorageAccess()
-        accessStatus.text = if (granted) "权限已授予" else "需要照片与所有文件访问权限"
-        accessStatus.setTextColor(getColor(if (granted) R.color.permission_granted else R.color.permission_missing))
         scanButton.isEnabled = granted
         galleryButton.isEnabled = granted
         duplicateScanButton.isEnabled = granted
@@ -851,6 +851,21 @@ class MainActivity : Activity() {
         duplicateDeleteButton.postDelayed({
             if (!isFinishing && !isDestroyed) refreshDuplicateOperationButtonWhenIdle()
         }, 500)
+    }
+
+    private fun showPhotoPreview(file: File) {
+        val image = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.55f).toInt())
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setImageResource(android.R.drawable.ic_menu_gallery)
+            contentDescription = "${file.name} 的放大预览"
+        }
+        val dialog = MaterialAlertDialogBuilder(this).setTitle("照片预览").setMessage(file.name)
+            .setView(image).setPositiveButton("关闭", null).show()
+        Thread {
+            val bitmap = runCatching { ThumbnailUtils.createImageThumbnail(file, Size(1080, 1080), null) }.getOrNull()
+            image.post { if (dialog.isShowing && bitmap != null) image.setImageBitmap(bitmap) }
+        }.start()
     }
 
     private fun showDuplicateComparison(candidate: DuplicateCandidate) {

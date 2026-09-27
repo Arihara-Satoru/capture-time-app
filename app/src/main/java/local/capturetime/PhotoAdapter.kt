@@ -12,7 +12,10 @@ import android.media.ThumbnailUtils
 import android.util.Size
 import java.util.concurrent.Executors
 
-class PhotoAdapter(private val onSelected: (PhotoRecord) -> Unit) : RecyclerView.Adapter<PhotoAdapter.Holder>() {
+class PhotoAdapter(
+    private val onSelected: (PhotoRecord) -> Unit,
+    private val onPreview: (PhotoRecord) -> Unit,
+) : RecyclerView.Adapter<PhotoAdapter.Holder>() {
     private var items: List<PhotoRecord> = emptyList()
     private var selectedPath: String? = null
     private val thumbnailExecutor = Executors.newFixedThreadPool(2)
@@ -36,6 +39,8 @@ class PhotoAdapter(private val onSelected: (PhotoRecord) -> Unit) : RecyclerView
 
         fun bind(record: PhotoRecord) {
             preview.tag = record.file.absolutePath
+            preview.contentDescription = "放大查看 ${record.file.name}"
+            preview.setOnClickListener { onPreview(record) }
             preview.setImageResource(android.R.drawable.ic_menu_gallery)
             thumbnailExecutor.execute {
                 val bitmap = runCatching {
