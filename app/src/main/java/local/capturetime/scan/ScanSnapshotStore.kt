@@ -30,6 +30,7 @@ class ScanSnapshotStore(context: Context) {
                 put("candidate", record.candidate)
                 put("safe", record.safeForTrial)
                 put("reason", record.reason)
+                put("extensionCorrection", record.extensionCorrection ?: JSONObject.NULL)
             })
         }
         file.writeText(JSONObject().apply {
@@ -58,7 +59,8 @@ class ScanSnapshotStore(context: Context) {
                     item.longOrNull("current")?.let(Instant::ofEpochMilli),
                     item.stringOrNull("source")?.let(CaptureSource::valueOf),
                     item.longOrNull("target")?.let(Instant::ofEpochMilli),
-                    item.optBoolean("candidate"), item.optBoolean("safe"), item.optString("reason")
+                    item.optBoolean("candidate"), item.optBoolean("safe"), item.optString("reason"),
+                    item.stringOrNull("extensionCorrection")
                 ))
             }
         }

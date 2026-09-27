@@ -10,12 +10,12 @@
         app:title="小米相册时间修复" app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge" />
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
-        android:paddingHorizontal="16dp" android:orientation="vertical">
+        android:paddingHorizontal="10dp" android:orientation="vertical">
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
             app:cardCornerRadius="20dp" app:cardElevation="0dp" app:cardBackgroundColor="?attr/colorPrimaryContainer">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="vertical" android:padding="16dp">
+                android:orientation="vertical" android:padding="10dp">
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:text="照片时间正确，相册仍显示旧日期？" android:textStyle="bold"
                     android:textAppearance="@style/TextAppearance.Material3.TitleMedium" android:textColor="?attr/colorOnPrimaryContainer" />
@@ -53,7 +53,7 @@
             android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="全选" android:minHeight="48dp" android:enabled="false" />
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/galleryRootList" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
-            android:clipToPadding="false" android:paddingBottom="8dp" android:contentDescription="小米相册时间修复候选" />
+            android:clipToPadding="false" android:paddingBottom="6dp" android:contentDescription="小米相册时间修复候选" />
         <com.google.android.material.button.MaterialButton
             android:id="@+id/galleryRootRecovery" style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"

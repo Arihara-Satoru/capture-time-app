@@ -1,14 +1,18 @@
 package local.capturetime
 
 import android.Manifest
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.View
+import android.view.MotionEvent
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -18,6 +22,7 @@ import android.widget.LinearLayout
 import android.widget.Space
 import android.graphics.Bitmap
 import android.media.ThumbnailUtils
+import android.media.MediaScannerConnection
 import android.util.Size
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -35,16 +40,20 @@ import local.capturetime.operation.BackupOperationGuard
 import local.capturetime.operation.SafePhotoProcessor
 import local.capturetime.operation.SessionLogger
 import local.capturetime.scan.PhotoScanner
+import local.capturetime.scan.ImageExtension
 import local.capturetime.scan.ScanSnapshotStore
 import local.capturetime.settings.TimeRuleConfig
 import local.capturetime.time.CaptureTimeParser
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.button.MaterialButtonToggleGroup
 import java.io.File
 import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
 
 class MainActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
@@ -71,11 +80,16 @@ class MainActivity : Activity() {
     private var duplicateDeleteStateBlocked = false
     private var duplicatePendingStateUnreadable = false
     private var processingDialog: AlertDialog? = null
+    private var swipeStartX: Float? = null
+    private var swipeStartY = 0f
+    private var showingCapturePage = true
+    private var pageAnimationToken = 0
 
     private val scanButton by lazy { findViewById<Button>(R.id.scanButton) }
     private val galleryButton by lazy { findViewById<Button>(R.id.galleryButton) }
     private val trialButton by lazy { findViewById<Button>(R.id.trialButton) }
     private val batchButton by lazy { findViewById<Button>(R.id.batchButton) }
+    private val correctExtensionButton by lazy { findViewById<Button>(R.id.correctExtensionButton) }
     private val scanProgress by lazy { findViewById<ProgressBar>(R.id.scanProgress) }
     private val scanSummary by lazy { findViewById<TextView>(R.id.scanSummary) }
     private val accessStatus by lazy { findViewById<TextView>(R.id.accessStatus) }
@@ -115,6 +129,7 @@ class MainActivity : Activity() {
         scanButton.setOnClickListener { scanAllPhotos() }
         trialButton.setOnClickListener { confirmTrial() }
         batchButton.setOnClickListener { confirmBatch() }
+        correctExtensionButton.setOnClickListener { confirmExtensionCorrection() }
         findViewById<Button>(R.id.galleryRootEntry).setOnClickListener {
             startActivity(Intent(this, local.capturetime.gallery.GalleryRepairActivity::class.java))
         }
@@ -131,15 +146,12 @@ class MainActivity : Activity() {
                 else -> confirmDuplicateDelete()
             }
         }
-        findViewById<BottomNavigationView>(R.id.bottomNavigation).setOnItemSelectedListener { item ->
-            val captureSelected = item.itemId == R.id.navigationCaptureTime
-            findViewById<View>(R.id.captureTimePage).visibility = if (captureSelected) View.VISIBLE else View.GONE
-            findViewById<View>(R.id.duplicatePhotoPage).visibility = if (captureSelected) View.GONE else View.VISIBLE
-            findViewById<MaterialToolbar>(R.id.mainToolbar).title =
-                 if (captureSelected) "拍摄时间" else "重复照片"
-            true
+        val bottomNavigation = findViewById<MaterialButtonToggleGroup>(R.id.bottomNavigation)
+        bottomNavigation.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            showPage(checkedId == R.id.navigationCaptureTime)
         }
-        findViewById<BottomNavigationView>(R.id.bottomNavigation).selectedItemId = R.id.navigationCaptureTime
+        bottomNavigation.check(R.id.navigationCaptureTime)
         loadSavedScan()
         updatePermissionState()
         refreshPendingDuplicateDeleteState()
@@ -185,6 +197,72 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() { executor.shutdownNow(); super.onDestroy() }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                val bounds = Rect()
+                swipeStartX = if (findViewById<View>(R.id.contentPages).getGlobalVisibleRect(bounds) &&
+                    bounds.contains(event.rawX.toInt(), event.rawY.toInt())) event.rawX else null
+                swipeStartY = event.rawY
+            }
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> swipeStartX = null
+            MotionEvent.ACTION_UP -> {
+                val startX = swipeStartX
+                swipeStartX = null
+                if (startX != null) {
+                    val dx = event.rawX - startX
+                    val dy = event.rawY - swipeStartY
+                    if (abs(dx) >= 72 * resources.displayMetrics.density && abs(dx) > abs(dy) * 1.5f) {
+                        val cancel = MotionEvent.obtain(event)
+                        cancel.action = MotionEvent.ACTION_CANCEL
+                        super.dispatchTouchEvent(cancel)
+                        cancel.recycle()
+                        val navigation = findViewById<MaterialButtonToggleGroup>(R.id.bottomNavigation)
+                        navigation.check(if (dx < 0) R.id.navigationDuplicatePhoto else R.id.navigationCaptureTime)
+                        return true
+                    }
+                }
+                return super.dispatchTouchEvent(event)
+            }
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    private fun showPage(captureSelected: Boolean) {
+        if (captureSelected == showingCapturePage) return
+        val capture = findViewById<View>(R.id.captureTimePage)
+        val duplicate = findViewById<View>(R.id.duplicatePhotoPage)
+        val outgoing = if (showingCapturePage) capture else duplicate
+        val incoming = if (captureSelected) capture else duplicate
+        val width = findViewById<View>(R.id.contentPages).width.toFloat()
+        val direction = if (captureSelected) -1f else 1f
+        pageAnimationToken++
+        val token = pageAnimationToken
+        capture.animate().cancel()
+        duplicate.animate().cancel()
+        capture.translationX = 0f
+        duplicate.translationX = 0f
+        outgoing.visibility = View.VISIBLE
+        incoming.translationX = direction * width
+        incoming.visibility = View.VISIBLE
+        showingCapturePage = captureSelected
+        findViewById<MaterialToolbar>(R.id.mainToolbar).title = if (captureSelected) "拍摄时间" else "重复照片"
+        if (!ValueAnimator.areAnimatorsEnabled() || width == 0f) {
+            outgoing.visibility = View.GONE
+            incoming.translationX = 0f
+            return
+        }
+        val easing = DecelerateInterpolator()
+        incoming.animate().translationX(0f).setDuration(240).setInterpolator(easing).start()
+        outgoing.animate().translationX(-direction * width).setDuration(240).setInterpolator(easing)
+            .withEndAction {
+                if (pageAnimationToken == token) {
+                    outgoing.visibility = View.GONE
+                    outgoing.translationX = 0f
+                }
+            }.start()
+    }
 
     private fun updatePermissionState() {
         val granted = hasStorageAccess()
@@ -291,11 +369,64 @@ class MainActivity : Activity() {
 
     private fun renderRecords(fresh: Boolean) {
         val candidates = records.filter { it.candidate }
+        val corrections = records.filter { it.extensionCorrection != null }
         val filenameTimes = records.count { it.filenameTime != null }
-        adapter.submitList(candidates)
-        scanSummary.text = "$resultSource · 已检查 ${records.size} 张 · 文件名时间 $filenameTimes 张 · 候选 ${candidates.size} 张"
-        if (fresh) showStatus(if (records.isEmpty()) "范围内没有可识别图片。" else "扫描记录已保存到应用本机空间。请选择候选进行单张试运行。")
+        adapter.submitList(records.filter { it.candidate || it.extensionCorrection != null })
+        scanSummary.text = "$resultSource · 已检查 ${records.size} 张 · 文件名时间 $filenameTimes 张 · 时间候选 ${candidates.size} 张 · 后缀待纠正 ${corrections.size} 张"
+        if (fresh) showStatus(if (records.isEmpty()) "范围内没有可识别图片。" else "扫描记录已保存。时间候选可选择试运行；后缀待纠正项可直接批量处理。")
         updateActions()
+    }
+
+    private fun confirmExtensionCorrection() {
+        val pending = records.mapNotNull { record -> record.extensionCorrection?.let { record.file to it } }
+        if (pending.isEmpty()) return
+        if (!ensurePermission()) return
+        if (BackupOperationGuard.hasCaptureRecoveryState(applicationContext) ||
+            BackupOperationGuard.hasGalleryState(applicationContext) ||
+            duplicateOperationActive.get() || duplicateProcessor.hasBlockingState()) {
+            showError("存在待核验的处理会话，请先完成核验")
+            return
+        }
+        MaterialAlertDialogBuilder(this).setTitle("批量纠正图片后缀")
+            .setMessage("当前扫描范围内待纠正 ${pending.size} 张。将逐张重新核对内容并改为实际图片格式的后缀；已有同名文件会跳过。\n\n图片内容不会改变。系统媒体库时间可能重新生成，完成后会重新扫描。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("纠正 ${pending.size} 张") { _, _ -> correctExtensions(pending) }
+            .show()
+    }
+
+    private fun correctExtensions(pending: List<Pair<File, String>>) {
+        setBusy(true, "正在批量纠正后缀并更新媒体库...")
+        executor.execute {
+            val outcome = ImageExtension.correctAll(pending, Environment.getExternalStorageDirectory())
+            val renamed = outcome.renamed
+            val indexed = if (renamed.isEmpty()) 0 else runCatching {
+                val paths = renamed.flatMap { (old, new) -> listOf(old.absolutePath, new.absolutePath) }
+                val callbacks = CountDownLatch(paths.size)
+                MediaScannerConnection.scanFile(this, paths.toTypedArray(), null) { _, _ -> callbacks.countDown() }
+                callbacks.await(30, TimeUnit.SECONDS)
+                val index = mediaStore.queryAll()
+                renamed.count { (old, new) ->
+                    mediaStore.pathKey(new) in index && mediaStore.pathKey(old) !in index
+                }
+            }.getOrDefault(0)
+            val refreshed = runCatching {
+                scanner.scan(records.map { renamed[it.file] ?: it.file }).also(snapshotStore::save)
+            }
+            runOnUiThread {
+                setBusy(false, "")
+                refreshed.onSuccess {
+                    records = it; selected = null; jpegTrialPassed = false
+                    unlockedFormats.clear(); completedPaths.clear(); adapter.clearSelection(); renderRecords(false)
+                }
+                showStatus(buildString {
+                    append("后缀纠正完成：成功 ${renamed.size} 张，跳过 ${outcome.failures.size} 张。")
+                    if (indexed < renamed.size) append("媒体库仅确认 $indexed/${renamed.size} 张，请稍后重新扫描。")
+                    outcome.failures.take(5).forEach { (file, reason) -> append("\n${file.name}：$reason") }
+                    if (outcome.failures.size > 5) append("\n另有 ${outcome.failures.size - 5} 张未列出；重新扫描可查看剩余项。")
+                    refreshed.exceptionOrNull()?.let { append("\n刷新失败：${it.message}") }
+                })
+            }
+        }
     }
 
     private fun confirmTrial() {
@@ -794,6 +925,7 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.galleryRootEntry).text = if (BackupOperationGuard.hasGalleryState(applicationContext))
             "核验小米相册修复 · Root" else "小米相册时间修复 · Root"
         trialButton.isEnabled = granted && !recoveryBlocked && selected?.candidate == true && selected?.safeForTrial == true
+        correctExtensionButton.isEnabled = granted && !recoveryBlocked && scanProgress.visibility != View.VISIBLE && records.any { it.extensionCorrection != null }
         batchButton.isEnabled = granted && !recoveryBlocked && jpegTrialPassed && records.any { it.file.absolutePath !in completedPaths && it.candidate && it.safeForTrial && (it.format == ImageFormat.JPEG || it.format in unlockedFormats) }
     }
 
@@ -801,7 +933,7 @@ class MainActivity : Activity() {
         scanProgress.visibility = if (busy) View.VISIBLE else View.GONE
         scanButton.isEnabled = !busy && hasStorageAccess()
         galleryButton.isEnabled = !busy && hasStorageAccess()
-        trialButton.isEnabled = false; batchButton.isEnabled = false
+        trialButton.isEnabled = false; batchButton.isEnabled = false; correctExtensionButton.isEnabled = false
         if (message.isNotBlank()) showStatus(message)
         if (!busy) updateActions()
     }

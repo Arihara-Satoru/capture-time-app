@@ -5,12 +5,12 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
     android:fitsSystemWindows="true"
-    android:paddingBottom="4dp"
+    android:paddingBottom="2dp"
     android:orientation="vertical">
 
     <FrameLayout
         android:layout_width="match_parent"
-             android:layout_height="72dp">
+             android:layout_height="60dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/mainToolbar"
@@ -35,6 +35,7 @@
     </FrameLayout>
 
     <FrameLayout
+        android:id="@+id/contentPages"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
@@ -44,13 +45,13 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                 android:layout_marginTop="12dp"
+                 android:layout_marginTop="8dp"
                 app:cardBackgroundColor="?attr/colorPrimaryContainer"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="0dp">
@@ -59,7 +60,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                     android:padding="20dp">
+                     android:padding="8dp">
 
                     <TextView
                         android:layout_width="match_parent"
@@ -80,7 +81,7 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="8dp"
                         android:baselineAligned="false"
                         android:orientation="horizontal">
 
@@ -105,20 +106,23 @@
                             android:text="全局扫描"
                             app:icon="@drawable/ic_scan" />
                     </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/galleryRootEntry"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="48dp"
+                        android:text="小米相册时间修复 · Root"
+                        app:icon="@drawable/ic_lock" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/galleryRootEntry"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="8dp" android:minHeight="48dp"
-                android:text="小米相册时间修复 · Root" app:icon="@drawable/ic_lock" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="10dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -158,7 +162,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:background="?attr/colorSurfaceContainer"
-                android:padding="12dp"
+                android:padding="6dp"
                 android:textAppearance="@style/SupportingText"
                 android:textIsSelectable="true"
                 android:visibility="gone" />
@@ -171,7 +175,7 @@
                 android:layout_weight="1"
                 android:clipToPadding="false"
                 android:contentDescription="照片候选列表"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="6dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -186,7 +190,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="8dp">
 
                     <TextView
                         android:layout_width="match_parent"
@@ -198,7 +202,7 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="6dp"
                         android:baselineAligned="false"
                         android:orientation="horizontal">
 
@@ -210,20 +214,44 @@
                             android:layout_weight="1"
                             android:enabled="false"
                             android:minHeight="48dp"
-                            android:text="单张试运行"
-                            app:icon="@drawable/ic_shield" />
+                            android:text="试运行"
+                            android:singleLine="true"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:insetLeft="0dp"
+                            android:insetRight="0dp" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/batchButton"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
+                            android:layout_marginStart="4dp"
                             android:layout_weight="1"
                             android:enabled="false"
                             android:minHeight="48dp"
-                            android:text="查看并批量执行"
-                            app:icon="@drawable/ic_batch" />
+                            android:text="批量执行"
+                            android:singleLine="true"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:insetLeft="0dp"
+                            android:insetRight="0dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/correctExtensionButton"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:enabled="false"
+                            android:minHeight="48dp"
+                            android:text="纠正后缀"
+                            android:singleLine="true"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:insetLeft="0dp"
+                            android:insetRight="0dp" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -240,14 +268,40 @@
         </FrameLayout>
     </FrameLayout>
 
-    <com.google.android.material.bottomnavigation.BottomNavigationView
+    <com.google.android.material.button.MaterialButtonToggleGroup
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/colorSurfaceContainer"
-        android:minHeight="80dp"
-        app:itemActiveIndicatorStyle="@style/Widget.Material3.BottomNavigationView.ActiveIndicator"
-        app:itemIconSize="24dp"
-        app:labelVisibilityMode="labeled"
-        app:menu="@menu/main_bottom_navigation" />
+        android:minHeight="56dp"
+        android:padding="4dp"
+        app:singleSelection="true"
+        app:selectionRequired="true">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/navigationCaptureTime"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:text="拍摄时间纠正"
+            app:icon="@drawable/ic_capture_time"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="20dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/navigationDuplicatePhoto"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:text="照片重复纠正"
+            app:icon="@drawable/ic_duplicate_photo"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="20dp" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
 </LinearLayout>

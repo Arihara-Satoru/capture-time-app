@@ -47,13 +47,16 @@ class PhotoAdapter(private val onSelected: (PhotoRecord) -> Unit) : RecyclerView
             }
             itemView.isSelected = selectedPath == record.file.absolutePath
             title.text = record.file.name
-            format.text = " ${record.format.label} · ${if (record.safeForTrial) "可安全试运行" else "需人工确认"} "
-            target.text = "目标时间 · ${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}"
-            details.text = "当前时间 ${CaptureTimeParser.formatDisplay(record.currentCaptureTime)}\n" +
-                "添加时间 ${CaptureTimeParser.formatDisplay(record.media?.dateAdded)}\n" +
-                "文件名时间 ${CaptureTimeParser.formatDisplay(record.filenameTime)}"
+            format.text = if (record.extensionCorrection != null) " 后缀不符 · 建议 .${record.extensionCorrection} "
+                else " ${record.format.label} · ${if (record.safeForTrial) "可安全试运行" else "需人工确认"} "
+            target.text = if (record.extensionCorrection != null) record.reason
+                else "目标时间 · ${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}"
+            details.text = if (record.extensionCorrection != null) "改名后重新扫描，才会比较图片时间"
+                else "当前时间 ${CaptureTimeParser.formatDisplay(record.currentCaptureTime)}\n" +
+                    "添加时间 ${CaptureTimeParser.formatDisplay(record.media?.dateAdded)}\n" +
+                    "文件名时间 ${CaptureTimeParser.formatDisplay(record.filenameTime)}"
             path.text = record.file.parent ?: record.file.absolutePath
-            itemView.contentDescription = "${record.file.name}，${record.format.label}，目标时间 ${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}。${if (itemView.isSelected) "已选择" else "双击选择"}"
+            itemView.contentDescription = "${record.file.name}，${record.reason}。${if (itemView.isSelected) "已选择" else "点击选择"}"
             itemView.setOnClickListener {
                 selectedPath = record.file.absolutePath
                 itemView.isSelected = true

@@ -29,7 +29,8 @@ data class PhotoRecord(
     val targetCaptureTime: Instant?,
     val candidate: Boolean,
     val safeForTrial: Boolean,
-    val reason: String
+    val reason: String,
+    val extensionCorrection: String? = null
 )
 
 data class ProcessResult(
