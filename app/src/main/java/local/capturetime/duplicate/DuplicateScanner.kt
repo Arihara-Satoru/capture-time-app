@@ -26,10 +26,14 @@ class DuplicateScanner(private val mediaStore: MediaStoreGateway) {
         val candidates = DuplicateRules.findCandidates(assets)
         val hashCache = HashMap<String, String>()
         val hashedCandidates = candidates.map { candidate ->
-            candidate.copy(
+            val hashed = candidate.copy(
                 delete = candidate.delete.withHash(hashCache),
                 retained = candidate.retained.withHash(hashCache)
             )
+            if (DuplicateRules.isNumericSiblingPair(hashed) && !DuplicateRules.hasMatchingContent(hashed) &&
+                runCatching {
+                    FileVerification.sameJpegExceptExif(hashed.delete.file, hashed.retained.file)
+                }.getOrDefault(false)) hashed.copy(matchedByNameRule = true) else hashed
         }.filter(DuplicateRules::isEligibleCandidate)
         return DuplicateScanResult(realFiles.size, assets.size, hashedCandidates)
     }

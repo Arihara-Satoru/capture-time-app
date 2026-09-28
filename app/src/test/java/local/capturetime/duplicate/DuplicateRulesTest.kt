@@ -48,6 +48,18 @@ class DuplicateRulesTest {
         assertEquals("IMG_20260101_120000_1234567890123.jpg", DuplicateRules.findCandidates(files).single().delete.file.name)
     }
 
+    @Test fun `two numeric screenshot copies need EXIF-only JPEG confirmation`() {
+        val base = "/DCIM/Screenshots/Screenshot_2025-06-21-19-16-44-133_com.umetrip.android.msky.app"
+        val older = image("${base}_1790516728935.jpg", 1643327, 1080, 2400).copy(sha256 = "older")
+        val newer = image("${base}_1790518019938.jpg", 1643473, 1080, 2400).copy(sha256 = "newer")
+        val candidate = DuplicateRules.findCandidates(listOf(older, newer)).single()
+        assertEquals(older.file, candidate.delete.file)
+        assertEquals(newer.file, candidate.retained.file)
+        assertTrue(!DuplicateRules.isEligibleCandidate(candidate))
+        assertTrue(DuplicateRules.isEligibleCandidate(candidate.copy(matchedByNameRule = true)))
+        assertTrue(DuplicateRules.findCandidates(listOf(older, newer.copy(height = 2300))).isEmpty())
+    }
+
     @Test fun `numeric camera copy with rotated display dimensions is detected`() {
         val files = listOf(
             image("/DCIM/Camera/IMG_20221203_174311.jpg", 125706, 1440, 1080),

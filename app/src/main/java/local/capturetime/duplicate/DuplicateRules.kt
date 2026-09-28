@@ -145,7 +145,22 @@ object DuplicateRules {
         groups.forEach { (base, variants) ->
             val numeric = variants.filterNot { it.second }
             val hex = variants.filter { it.second }
-            if (base in baseNames || numeric.size != 1 || hex.size != 1) return@forEach
+            if (base in baseNames) return@forEach
+            if (numeric.size == 2 && hex.isEmpty()) {
+                val pair = numeric.map { it.first }
+                val retained = pair.maxBy { it.size }
+                val candidate = DuplicateCandidate(
+                    delete = pair.single { it.file != retained.file },
+                    retained = retained,
+                    reason = "同目录两张 13 位数字后缀照片的文件名和画面尺寸一致；除 EXIF 外 JPEG 内容相同，请比对后确认"
+                )
+                if (isNumericSiblingPair(candidate)) {
+                    groupPaths += pair.map { it.file.absolutePath }
+                    candidates += candidate
+                }
+                return@forEach
+            }
+            if (numeric.size != 1 || hex.size != 1) return@forEach
             val pair = listOf(numeric.single().first, hex.single().first)
             groupPaths += pair.map { it.file.absolutePath }
             val retained = variants.maxWithOrNull(
@@ -171,8 +186,22 @@ object DuplicateRules {
             isPrefixPair(candidate.retained, candidate.delete) ||
             isHexOriginalPair(candidate.delete, candidate.retained) ||
             isHexOriginalPair(candidate.retained, candidate.delete) ||
+            isNumericSiblingPair(candidate) ||
             isNumericHexPair(candidate.delete, candidate.retained) ||
             isNumericHexPair(candidate.retained, candidate.delete)
+    }
+
+    fun isNumericSiblingPair(candidate: DuplicateCandidate): Boolean {
+        val first = candidate.delete
+        val second = candidate.retained
+        if (first.kind != MediaKind.IMAGE || second.kind != MediaKind.IMAGE ||
+            directoryKey(first) != directoryKey(second) || extension(first) != extension(second) ||
+            extension(first) !in setOf("jpg", "jpeg") ||
+            first.width != second.width || first.height != second.height) return false
+        val firstName = numericCopy.matchEntire(stem(first)) ?: return false
+        val secondName = numericCopy.matchEntire(stem(second)) ?: return false
+        return firstName.groupValues[1].equals(secondName.groupValues[1], true) &&
+            firstName.groupValues[2] != secondName.groupValues[2]
     }
 
     private fun isHexOriginalPair(copy: DuplicateAsset, original: DuplicateAsset): Boolean =
