@@ -187,8 +187,20 @@ object DuplicateRules {
             isHexOriginalPair(candidate.delete, candidate.retained) ||
             isHexOriginalPair(candidate.retained, candidate.delete) ||
             isNumericSiblingPair(candidate) ||
+            isNumericOriginalPair(candidate) ||
             isNumericHexPair(candidate.delete, candidate.retained) ||
             isNumericHexPair(candidate.retained, candidate.delete)
+    }
+
+    fun isNumericOriginalPair(candidate: DuplicateCandidate): Boolean {
+        val first = candidate.delete
+        val second = candidate.retained
+        if (first.kind != MediaKind.IMAGE || second.kind != MediaKind.IMAGE ||
+            directoryKey(first) != directoryKey(second) || extension(first) != extension(second) ||
+            extension(first) !in setOf("jpg", "jpeg") ||
+            first.width != second.width || first.height != second.height) return false
+        return numericCopy.matchEntire(stem(first))?.groupValues?.get(1)?.equals(stem(second), true) == true ||
+            numericCopy.matchEntire(stem(second))?.groupValues?.get(1)?.equals(stem(first), true) == true
     }
 
     fun isNumericSiblingPair(candidate: DuplicateCandidate): Boolean {
@@ -243,7 +255,7 @@ object DuplicateRules {
             sameResolution.filter { it !== retained && it.size <= retained.size }.forEach { smaller ->
                 candidates.putIfAbsent(
                     smaller.file.absolutePath,
-                    DuplicateCandidate(smaller, retained, "同扩展名、同分辨率，最终仅保留 SHA-256 完全一致的副本")
+                    DuplicateCandidate(smaller, retained, "同扩展名、同分辨率；仅接受相同内容（数字后缀 JPEG 可仅 EXIF 不同）")
                 )
             }
         }

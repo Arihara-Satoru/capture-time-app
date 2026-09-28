@@ -60,6 +60,19 @@ class DuplicateRulesTest {
         assertTrue(DuplicateRules.findCandidates(listOf(older, newer.copy(height = 2300))).isEmpty())
     }
 
+    @Test fun `original screenshot and numeric copy need EXIF-only JPEG confirmation`() {
+        val base = "/DCIM/Screenshots/Screenshot_2025-03-17-16-43-56-709_com.miui.home"
+        val original = image("$base.jpg", 601207, 1080, 2400).copy(sha256 = "original")
+        val copy = image("${base}_1790516699719.jpg", 601061, 1080, 2400).copy(sha256 = "copy")
+        val candidate = DuplicateRules.findCandidates(listOf(original, copy)).single()
+        assertEquals(copy.file, candidate.delete.file)
+        assertEquals(original.file, candidate.retained.file)
+        assertTrue(DuplicateRules.isNumericOriginalPair(candidate))
+        assertTrue(!DuplicateRules.isEligibleCandidate(candidate))
+        assertTrue(DuplicateRules.isEligibleCandidate(candidate.copy(matchedByNameRule = true)))
+        assertTrue(DuplicateRules.findCandidates(listOf(original, copy.copy(height = 2300))).isEmpty())
+    }
+
     @Test fun `numeric camera copy with rotated display dimensions is detected`() {
         val files = listOf(
             image("/DCIM/Camera/IMG_20221203_174311.jpg", 125706, 1440, 1080),

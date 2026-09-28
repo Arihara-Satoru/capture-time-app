@@ -30,7 +30,8 @@ class DuplicateScanner(private val mediaStore: MediaStoreGateway) {
                 delete = candidate.delete.withHash(hashCache),
                 retained = candidate.retained.withHash(hashCache)
             )
-            if (DuplicateRules.isNumericSiblingPair(hashed) && !DuplicateRules.hasMatchingContent(hashed) &&
+            if ((DuplicateRules.isNumericSiblingPair(hashed) || DuplicateRules.isNumericOriginalPair(hashed)) &&
+                !DuplicateRules.hasMatchingContent(hashed) &&
                 runCatching {
                     FileVerification.sameJpegExceptExif(hashed.delete.file, hashed.retained.file)
                 }.getOrDefault(false)) hashed.copy(matchedByNameRule = true) else hashed
