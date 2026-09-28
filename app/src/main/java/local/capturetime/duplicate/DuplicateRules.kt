@@ -8,6 +8,8 @@ object DuplicateRules {
     private val safeHexCopy = Regex("^((?:IMG|MVIMG)_\\d{8}_\\d{6})_([0-9A-Fa-f]{6})$", RegexOption.IGNORE_CASE)
     private val safeVideoHexCopy = Regex("^(VID_\\d{8}_\\d{6})_([0-9A-Fa-f]{6})$", RegexOption.IGNORE_CASE)
     private val numericCopy = Regex("^(.+)_([0-9]{13})$")
+    // ponytail: six digits can be a capture time; extend this only for another verified screenshot naming pattern.
+    private val numericScreenshotCopy = Regex("^(Screenshot_\\d{4}-\\d{2}-\\d{2}-\\d{2}-\\d{2}-\\d{2}-\\d{3}_[A-Za-z].+)_([0-9]{6})$", RegexOption.IGNORE_CASE)
     private val hexCopy = Regex("^(.+)_([0-9A-Fa-f]{6})$")
     private val bracketCopy = Regex("^(.+?)\\s*\\(([0-9]+)\\)$")
 
@@ -43,6 +45,7 @@ object DuplicateRules {
             setOf(it.delete.file.absolutePath, it.retained.file.absolutePath)
         }
         val (suffixCandidates, suffixGroupPaths) = findNumericHexCandidates(assets)
+        val numericScreenshotCandidates = findNumericScreenshotCandidates(assets)
         val existingCandidates = assets.groupBy { extension(it) }.values.flatMap { sameExtension ->
             val byStem = sameExtension.associateBy { stem(it).lowercase(Locale.ROOT) }
             val grouped = linkedMapOf<String, MutableList<DuplicateAsset>>()
@@ -86,7 +89,18 @@ object DuplicateRules {
                             it.retained.file.absolutePath in suffixGroupPaths)
                 }
         }
-        return existingCandidates + prefixCandidates + suffixCandidates
+        return existingCandidates + prefixCandidates + suffixCandidates + numericScreenshotCandidates
+    }
+
+    private fun findNumericScreenshotCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
+        val byName = assets.associateBy { stem(it).lowercase(Locale.ROOT) to extension(it) }
+        return assets.mapNotNull { copy ->
+            val base = numericScreenshotCopy.matchEntire(stem(copy))?.groupValues?.get(1) ?: return@mapNotNull null
+            val original = byName[base.lowercase(Locale.ROOT) to extension(copy)] ?: return@mapNotNull null
+            val (delete, retained) = if (copy.size <= original.size) copy to original else original to copy
+            DuplicateCandidate(delete, retained, "同目录截图原名与 6 位数字后缀匹配；除 EXIF 外 JPEG 内容相同，请比对后确认")
+                .takeIf(::isNumericOriginalPair)
+        }
     }
 
     private fun findUnderscoreCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
@@ -199,9 +213,13 @@ object DuplicateRules {
             directoryKey(first) != directoryKey(second) || extension(first) != extension(second) ||
             extension(first) !in setOf("jpg", "jpeg") ||
             first.width != second.width || first.height != second.height) return false
-        return numericCopy.matchEntire(stem(first))?.groupValues?.get(1)?.equals(stem(second), true) == true ||
-            numericCopy.matchEntire(stem(second))?.groupValues?.get(1)?.equals(stem(first), true) == true
+        return numericOriginalBase(stem(first))?.equals(stem(second), true) == true ||
+            numericOriginalBase(stem(second))?.equals(stem(first), true) == true
     }
+
+    private fun numericOriginalBase(name: String): String? =
+        numericCopy.matchEntire(name)?.groupValues?.get(1)
+            ?: numericScreenshotCopy.matchEntire(name)?.groupValues?.get(1)
 
     fun isNumericSiblingPair(candidate: DuplicateCandidate): Boolean {
         val first = candidate.delete

@@ -73,6 +73,33 @@ class DuplicateRulesTest {
         assertTrue(DuplicateRules.findCandidates(listOf(original, copy.copy(height = 2300))).isEmpty())
     }
 
+    @Test fun `dated screenshot and six digit numeric copy need EXIF-only JPEG confirmation`() {
+        val base = "/DCIM/Screenshots/Screenshot_2023-03-23-22-44-54-227_com.xunmeng.pinduoduo"
+        val original = image("$base.jpg", 1047308, 1440, 3200).copy(sha256 = "original")
+        val copy = image("${base}_828892.jpg", 1047454, 1440, 3200).copy(sha256 = "copy")
+        val candidate = DuplicateRules.findCandidates(listOf(original, copy)).single()
+        assertEquals(original.file, candidate.delete.file)
+        assertEquals(copy.file, candidate.retained.file)
+        assertTrue(DuplicateRules.isNumericOriginalPair(candidate))
+        assertTrue(!DuplicateRules.isEligibleCandidate(candidate))
+        assertTrue(DuplicateRules.isEligibleCandidate(candidate.copy(matchedByNameRule = true)))
+        assertTrue(DuplicateRules.findCandidates(listOf(original, copy.copy(height = 3000))).isEmpty())
+    }
+
+    @Test fun `renamed or resized screenshots are not matched by name alone`() {
+        val bili = "/DCIM/Screenshots/Screenshot_2023-01-17-00-19-32-754_tv.danmaku.bili"
+        assertTrue(DuplicateRules.findCandidates(listOf(
+            image("$bili.png", 197945, 1248, 1170),
+            image("${bili}_1758332412460.jpg", 115378, 1152, 1080)
+        )).isEmpty())
+
+        val kihan = "/DCIM/Screenshots/Screenshot_2023-02-14-16-53-45-198_"
+        assertTrue(DuplicateRules.findCandidates(listOf(
+            image("${kihan}com.tencent.KiHan_dedf6a.jpg", 1552512, 3200, 1440),
+            image("${kihan}com_1692945989089.tencent.KiHan_dc7389.jpg", 1601535, 3200, 1440)
+        )).isEmpty())
+    }
+
     @Test fun `numeric camera copy with rotated display dimensions is detected`() {
         val files = listOf(
             image("/DCIM/Camera/IMG_20221203_174311.jpg", 125706, 1440, 1080),
