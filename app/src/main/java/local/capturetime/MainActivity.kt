@@ -69,7 +69,6 @@ class MainActivity : Activity() {
     private lateinit var duplicateAdapter: DuplicateAdapter
     private var records: List<PhotoRecord> = emptyList()
     private var selected: PhotoRecord? = null
-    private var jpegTrialPassed = false
     private val unlockedFormats = mutableSetOf<ImageFormat>()
     private val completedPaths = mutableSetOf<String>()
     private var lastSession: File? = null
@@ -359,7 +358,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 setBusy(false, "")
                 result.onSuccess {
-                    records = it; selected = null; jpegTrialPassed = false
+                    records = it; selected = null
                     unlockedFormats.clear(); completedPaths.clear(); adapter.clearSelection(); renderRecords(true)
                     resultText.append(suffix(it))
                 }.onFailure { showError("扫描失败：${it.message}") }
@@ -415,7 +414,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 setBusy(false, "")
                 refreshed.onSuccess {
-                    records = it; selected = null; jpegTrialPassed = false
+                    records = it; selected = null
                     unlockedFormats.clear(); completedPaths.clear(); adapter.clearSelection(); renderRecords(false)
                 }
                 showStatus(buildString {
@@ -437,7 +436,7 @@ class MainActivity : Activity() {
     }
 
     private fun confirmBatch() {
-        val processable = records.filter { it.file.absolutePath !in completedPaths && it.candidate && it.safeForTrial && (it.format == ImageFormat.JPEG || it.format in unlockedFormats) }
+        val processable = records.filter { it.file.absolutePath !in completedPaths && it.candidate && it.safeForTrial && it.format in unlockedFormats }
         MaterialAlertDialogBuilder(this).setTitle("批量执行风险确认")
             .setMessage("预计处理：${processable.size} 张\n其余项目将记录为跳过。\n\n每张均独立执行备份、哈希、EXIF、媒体扫描及恢复链路。操作不会改名、删除或修改添加时间。")
             .setNegativeButton("取消", null).setPositiveButton("确认批量写入") { _, _ -> runSession(processable, false) }.show()
@@ -491,7 +490,6 @@ class MainActivity : Activity() {
                     lastSession = session.directory
                     if (trial && results.singleOrNull()?.success == true) {
                         unlockedFormats += results.single().record.format
-                        if (results.single().record.format == ImageFormat.JPEG) jpegTrialPassed = true
                     }
                     val successfulPaths = results.filter { it.success }.mapTo(hashSetOf()) { it.record.file.absolutePath }
                     results.filter { it.success }.forEach { completedPaths += it.record.file.absolutePath }
@@ -503,7 +501,8 @@ class MainActivity : Activity() {
                         renderRecords(false)
                     }
                     val success = results.count { it.success }; val restored = results.count { it.restored }
-                    showStatus("本次成功 $success，恢复 $restored，失败 ${results.size - success}。已成功修改的照片已从候选预览移除。")
+                    val trialHint = if (trial && success == 1) "${results.single().record.format.label} 试运行通过，可批量执行同格式照片。" else ""
+                    showStatus("本次成功 $success，恢复 $restored，失败 ${results.size - success}。已成功修改的照片已从候选预览移除。$trialHint")
                     updateActions()
                     showSessionLog(session.directory, success, restored, results.size - success)
                 }.onFailure {
@@ -941,7 +940,7 @@ class MainActivity : Activity() {
             "核验小米相册修复 · Root" else "小米相册时间修复 · Root"
         trialButton.isEnabled = granted && !recoveryBlocked && selected?.candidate == true && selected?.safeForTrial == true
         correctExtensionButton.isEnabled = granted && !recoveryBlocked && scanProgress.visibility != View.VISIBLE && records.any { it.extensionCorrection != null }
-        batchButton.isEnabled = granted && !recoveryBlocked && jpegTrialPassed && records.any { it.file.absolutePath !in completedPaths && it.candidate && it.safeForTrial && (it.format == ImageFormat.JPEG || it.format in unlockedFormats) }
+        batchButton.isEnabled = granted && !recoveryBlocked && records.any { it.file.absolutePath !in completedPaths && it.candidate && it.safeForTrial && it.format in unlockedFormats }
     }
 
     private fun setBusy(busy: Boolean, message: String) {
