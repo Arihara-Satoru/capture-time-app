@@ -23,7 +23,20 @@ class DuplicateScanner(private val mediaStore: MediaStoreGateway) {
             if (details.width <= 0 || details.height <= 0) return@mapNotNull null
             DuplicateAsset(file, details.kind, details.width, details.height, details.durationMillis, file.length())
         }
-        val candidates = DuplicateRules.findCandidates(assets)
+        // ponytail: the JPEG header gives a cheap exact-size key; hash whole image data only for matching keys.
+        val exifFreeHashes = assets.asSequence()
+            .filter { it.kind == MediaKind.IMAGE && it.file.extension.lowercase(Locale.ROOT) in setOf("jpg", "jpeg") }
+            .mapNotNull { asset ->
+                val size = runCatching { FileVerification.jpegWithoutExifSize(asset.file) }.getOrNull()
+                    ?: return@mapNotNull null
+                Triple(asset.file.parentFile?.absolutePath?.lowercase(Locale.ROOT), asset.width to asset.height, size) to asset
+            }.groupBy { it.first }.values.asSequence()
+            .filter { it.size > 1 }
+            .flatMap { group -> group.asSequence().mapNotNull { (_, asset) ->
+                runCatching { FileVerification.jpegWithoutExifHash(asset.file) }.getOrNull()?.let { asset.file to it }
+            } }.toMap()
+        val candidates = (DuplicateRules.findJpegContentCandidates(assets, exifFreeHashes) +
+            DuplicateRules.findCandidates(assets)).distinctBy { it.delete.file.absolutePath.lowercase(Locale.ROOT) }
         val hashCache = HashMap<String, String>()
         val hashedCandidates = candidates.map { candidate ->
             val hashed = candidate.copy(

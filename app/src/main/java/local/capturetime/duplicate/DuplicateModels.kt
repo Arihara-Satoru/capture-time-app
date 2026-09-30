@@ -21,7 +21,8 @@ data class DuplicateCandidate(
     val delete: DuplicateAsset,
     val retained: DuplicateAsset,
     val reason: String,
-    val matchedByNameRule: Boolean = false
+    val matchedByNameRule: Boolean = false,
+    val matchedByExifFreeJpeg: Boolean = false
 )
 
 data class DuplicateScanResult(

@@ -37,7 +37,31 @@ object DuplicateRules {
 
     fun isEligibleCandidate(candidate: DuplicateCandidate): Boolean =
         hasMatchingContent(candidate) ||
+            (candidate.matchedByExifFreeJpeg && isJpegContentPair(candidate)) ||
             (candidate.matchedByNameRule && isNameRulePair(candidate))
+
+    fun findJpegContentCandidates(assets: List<DuplicateAsset>, hashes: Map<File, String>): List<DuplicateCandidate> =
+        assets.mapNotNull { asset ->
+            if (asset.kind != MediaKind.IMAGE || extension(asset) !in setOf("jpg", "jpeg")) return@mapNotNull null
+            val hash = hashes[asset.file]?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+            Triple(directoryKey(asset), asset.width to asset.height, hash) to asset
+        }.groupBy { it.first }.values.flatMap { group ->
+            val files = group.map { it.second }
+            if (files.size < 2) return@flatMap emptyList()
+            val retained = files.maxWith(compareBy<DuplicateAsset> { it.size }.thenBy { it.file.name })
+            files.filter { it != retained }.map { delete ->
+                DuplicateCandidate(delete, retained, "同目录 JPEG 除 EXIF 外内容完全一致；EXIF 时间可能不同，请核对。默认保留文件较大的版本", matchedByExifFreeJpeg = true)
+            }
+        }
+
+    private fun isJpegContentPair(candidate: DuplicateCandidate): Boolean {
+        val first = candidate.delete
+        val second = candidate.retained
+        return first.kind == MediaKind.IMAGE && second.kind == MediaKind.IMAGE &&
+            directoryKey(first) == directoryKey(second) &&
+            extension(first) in setOf("jpg", "jpeg") && extension(second) in setOf("jpg", "jpeg") &&
+            first.width > 0 && first.height > 0 && first.width == second.width && first.height == second.height
+    }
 
     private fun findImageCandidates(assets: List<DuplicateAsset>): List<DuplicateCandidate> {
         val prefixCandidates = findUnderscoreCandidates(assets)

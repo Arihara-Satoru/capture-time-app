@@ -11,8 +11,8 @@ android {
         applicationId = "local.capturetime"
         minSdk = 30
         targetSdk = 35
-        versionCode = 27
-        versionName = "1.5.6"
+        versionCode = 28
+        versionName = "1.5.7"
         manifestPlaceholders["appLabel"] = "拍摄时间修正"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

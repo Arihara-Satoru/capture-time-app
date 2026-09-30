@@ -183,6 +183,22 @@ class DuplicateRulesTest {
         )))
     }
 
+    @Test fun `JPEG content match finds unrelated filenames in one folder`() {
+        val camera = image("/DCIM/Camera/wx_camera_1572139196819.jpg", 219341, 720, 1280)
+        val other = image("/DCIM/Camera/wx_20191027_231508_651.jpg", 219401, 720, 1280)
+        val hashes = mapOf(camera.file to "same-image", other.file to "same-image")
+        val candidate = DuplicateRules.findJpegContentCandidates(listOf(camera, other), hashes).single()
+        assertEquals(camera.file, candidate.delete.file)
+        assertEquals(other.file, candidate.retained.file)
+        assertTrue(DuplicateRules.isEligibleCandidate(candidate))
+        assertTrue(DuplicateRules.findJpegContentCandidates(listOf(camera, other), hashes + (other.file to "different")).isEmpty())
+        assertTrue(DuplicateRules.findJpegContentCandidates(listOf(camera, other.copy(height = 1200)), hashes).isEmpty())
+        val elsewhere = other.copy(file = File("/Pictures/other.jpg"))
+        assertTrue(DuplicateRules.findJpegContentCandidates(
+            listOf(camera, elsewhere), hashes + (elsewhere.file to "same-image")
+        ).isEmpty())
+    }
+
     private fun image(path: String, size: Long, width: Int = 1000, height: Int = 1000) =
         DuplicateAsset(File(path), MediaKind.IMAGE, width, height, size = size)
 
