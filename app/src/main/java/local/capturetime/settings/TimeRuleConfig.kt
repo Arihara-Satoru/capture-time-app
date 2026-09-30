@@ -32,15 +32,26 @@ data class TimeRuleConfig(
     val zone: ZoneId = CaptureTimeParser.zone
 ) {
     fun selectTarget(values: Map<TimeField, Instant?>): Instant? {
-        val available = sourceFields.mapNotNull(values::get)
+        val available = sourceFields.mapNotNull(values::get).map { it.atZone(zone) }
+        // ponytail: 00:00 is treated as date-only when another selected source gives a time that day.
+        val timedDates = available.filter { it.hour != 0 || it.minute != 0 }.mapTo(hashSetOf()) { it.toLocalDate() }
+        val candidates = available.filter {
+            it.hour != 0 || it.minute != 0 || it.toLocalDate() !in timedDates
+        }.map { it.toInstant() }
         return when (selection) {
-            TimeSelection.EARLIEST -> available.minOrNull()
-            TimeSelection.LATEST -> available.maxOrNull()
+            TimeSelection.EARLIEST -> candidates.minOrNull()
+            TimeSelection.LATEST -> candidates.maxOrNull()
         }
     }
 
-    fun needsChange(actual: Instant?, target: Instant): Boolean =
-        actual == null || abs(actual.epochSecond - target.epochSecond) > toleranceSeconds
+    fun needsChange(actual: Instant?, target: Instant): Boolean {
+        if (actual == null) return true
+        val current = actual.atZone(zone)
+        val desired = target.atZone(zone)
+        return (current.hour == 0 && current.minute == 0 && (desired.hour != 0 || desired.minute != 0) &&
+            current.toLocalDate() == desired.toLocalDate()) ||
+            abs(actual.epochSecond - target.epochSecond) > toleranceSeconds
+    }
 
     fun fieldsNeedingChange(
         values: Map<TimeField, Instant?>,

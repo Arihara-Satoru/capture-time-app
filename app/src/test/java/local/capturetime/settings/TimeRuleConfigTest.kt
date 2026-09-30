@@ -9,6 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.time.ZoneId
 
 class TimeRuleConfigTest {
     private val early = Instant.parse("2024-01-01T00:00:00Z")
@@ -22,6 +23,40 @@ class TimeRuleConfigTest {
     @Test fun selectsLatestConfiguredAvailableField() {
         val rule = TimeRuleConfig(TimeSelection.LATEST, setOf(TimeField.FILENAME, TimeField.MEDIA_DATE_ADDED))
         assertEquals(late, rule.selectTarget(mapOf(TimeField.FILENAME to late, TimeField.MEDIA_DATE_ADDED to early)))
+    }
+
+    @Test fun screenshotMidnightUsesSameDayFilenameTimeAndRepairsDestinations() {
+        val rule = TimeRuleConfig(toleranceSeconds = 3600)
+        val midnight = Instant.ofEpochMilli(1512057600000L)
+        val filename = CaptureTimeParser.parseFilename("Screenshot_2017-12-01-18-36-57")!!
+        val raw = ExifTimes("2017:12:01 00:00:00", "2017:12:01 00:00:00", "2017:12:01 00:00:00")
+        val values = rule.values(raw, MediaSnapshot(6923, midnight, late, late.epochSecond), filename, midnight)
+        assertEquals(Instant.ofEpochMilli(1512124617000L), rule.selectTarget(values))
+        assertEquals(TimeRuleConfig.DEFAULT_DESTINATIONS, rule.fieldsNeedingChange(values, filename, raw).toSet())
+        assertTrue(rule.needsChange(midnight, midnight.plusSeconds(30 * 60)))
+    }
+
+    @Test fun onlySameDaySelectedTimesDisqualifyMidnight() {
+        val rule = TimeRuleConfig(sourceFields = setOf(TimeField.CURRENT_CAPTURE, TimeField.FILENAME))
+        val midnight = Instant.parse("2024-01-01T16:00:00Z")
+        val values = mapOf(TimeField.CURRENT_CAPTURE to midnight, TimeField.FILENAME to midnight.plusSeconds(3600))
+        assertEquals(midnight.plusSeconds(3600), rule.selectTarget(values))
+        assertEquals(midnight, rule.selectTarget(values + (TimeField.FILENAME to midnight.plusSeconds(86400 + 3600))))
+        assertEquals(midnight, rule.copy(sourceFields = setOf(TimeField.CURRENT_CAPTURE)).selectTarget(values))
+        assertEquals(midnight, rule.selectTarget(mapOf(TimeField.CURRENT_CAPTURE to midnight)))
+    }
+
+    @Test fun midnightRuleUsesConfiguredZoneAndPreservesTimeSelection() {
+        val midnight = Instant.parse("2024-01-01T16:00:00Z")
+        val first = midnight.plusSeconds(3600)
+        val last = midnight.plusSeconds(7200)
+        val values = mapOf(TimeField.CURRENT_CAPTURE to midnight, TimeField.FILENAME to first, TimeField.MEDIA_DATE_TAKEN to last)
+        val rule = TimeRuleConfig(sourceFields = values.keys)
+        assertEquals(first, rule.selectTarget(values))
+        assertEquals(last, rule.copy(selection = TimeSelection.LATEST).selectTarget(values))
+        assertEquals(midnight, rule.copy(zone = ZoneId.of("UTC")).selectTarget(values))
+        assertEquals(first, rule.selectTarget(values + (TimeField.CURRENT_CAPTURE to midnight.plusMillis(979))))
+        assertEquals(first, rule.selectTarget(values + (TimeField.CURRENT_CAPTURE to midnight.plusSeconds(30))))
     }
 
     @Test fun selectsMmexportFilenameTimeWhenItIsEarliestDefaultSource() {

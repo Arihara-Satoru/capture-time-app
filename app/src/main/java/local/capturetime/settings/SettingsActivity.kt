@@ -12,15 +12,17 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ArrayAdapter
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import local.capturetime.BuildConfig
 import local.capturetime.duplicate.DuplicateDeleteProcessor
-import local.capturetime.time.CaptureTimeParser
 import java.io.File
+import java.time.Instant
 import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 class SettingsActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("settings", MODE_PRIVATE) }
@@ -28,8 +30,10 @@ class SettingsActivity : Activity() {
     private lateinit var hours: EditText
     private lateinit var minutes: EditText
     private lateinit var seconds: EditText
-    private lateinit var selection: Spinner
-    private lateinit var timeZone: EditText
+    private lateinit var selection: MaterialAutoCompleteTextView
+    private lateinit var timeZone: MaterialAutoCompleteTextView
+    private lateinit var timeZoneLabels: List<String>
+    private lateinit var timeZones: List<ZoneId>
     private val sourceBoxes = linkedMapOf<TimeField, CheckBox>()
     private val destinationBoxes = linkedMapOf<TimeField, CheckBox>()
 
@@ -42,7 +46,7 @@ class SettingsActivity : Activity() {
         seconds = findViewById(local.capturetime.R.id.settingSeconds)
         selection = findViewById(local.capturetime.R.id.timeSelection)
         timeZone = findViewById(local.capturetime.R.id.settingTimeZone)
-        selection.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, TimeSelection.entries.map { it.label })
+        selection.setAdapter(ArrayAdapter(this, local.capturetime.R.layout.settings_dropdown_item, TimeSelection.entries.map { it.label }))
         sourceBoxes.putAll(mapOf(
             TimeField.CURRENT_CAPTURE to findViewById(local.capturetime.R.id.sourceCurrentCapture),
             TimeField.EXIF_ORIGINAL to findViewById(local.capturetime.R.id.sourceExifOriginal),
@@ -60,8 +64,22 @@ class SettingsActivity : Activity() {
             TimeField.FILE_MODIFIED to findViewById(local.capturetime.R.id.destinationFileModified)
         ))
         val rule = TimeRuleConfig.load(this)
-        selection.setSelection(TimeSelection.entries.indexOf(rule.selection))
-        timeZone.setText(rule.zone.id)
+        selection.setText(rule.selection.label, false)
+        val commonZones = linkedMapOf(
+            "Asia/Shanghai" to "北京时间", "Asia/Hong_Kong" to "香港", "Asia/Taipei" to "台北",
+            "UTC" to "协调世界时", "Asia/Tokyo" to "东京", "Asia/Seoul" to "首尔",
+            "Asia/Singapore" to "新加坡", "Europe/London" to "伦敦", "Europe/Paris" to "巴黎",
+            "America/New_York" to "纽约", "America/Los_Angeles" to "洛杉矶", "Australia/Sydney" to "悉尼"
+        )
+        timeZones = (commonZones.keys + rule.zone.id + ZoneId.getAvailableZoneIds().sorted()).distinct().map(ZoneId::of)
+        val now = Instant.now()
+        timeZoneLabels = timeZones.map { zone ->
+            val label = commonZones[zone.id] ?: "${zone.getDisplayName(TextStyle.FULL, Locale.SIMPLIFIED_CHINESE)} · ${zone.id}"
+            val offset = zone.rules.getOffset(now).id.takeUnless { it == "Z" } ?: "+00:00"
+            "$label（UTC$offset）"
+        }
+        timeZone.setAdapter(ArrayAdapter(this, local.capturetime.R.layout.settings_dropdown_item, timeZoneLabels))
+        timeZone.setText(timeZoneLabels[timeZones.indexOf(rule.zone)], false)
         sourceBoxes.forEach { (field, box) -> box.isChecked = field in rule.sourceFields }
         destinationBoxes.forEach { (field, box) -> box.isChecked = field in rule.destinationFields }
         days.setText(prefs.getInt("days", 0).toString())
@@ -130,15 +148,17 @@ class SettingsActivity : Activity() {
         val h = hours.value(0..23) ?: return
         val m = minutes.value(0..59) ?: return
         val s = seconds.value(0..59) ?: return
-        val zone = runCatching { ZoneId.of(timeZone.text.toString().trim()) }.getOrNull()
-            ?: return errorText("请输入有效时区，例如 " + CaptureTimeParser.zone.id + " 或 +09:45")
+        val zone = timeZones.getOrNull(timeZoneLabels.indexOf(timeZone.text.toString()))
+            ?: return errorText("请选择照片时间时区")
+        val timeSelection = TimeSelection.entries.firstOrNull { it.label == selection.text.toString() }
+            ?: return errorText("请选择目标时间选取方式")
         val sources = sourceBoxes.filterValues { it.isChecked }.keys
         val destinations = destinationBoxes.filterValues { it.isChecked }.keys
         if (sources.isEmpty()) return errorText("请至少选择一个依据字段")
         if (destinations.isEmpty()) return errorText("请至少选择一个修改字段")
         prefs.edit()
             .putInt("days", d).putInt("hours", h).putInt("minutes", m).putInt("seconds", s)
-            .putString("time_selection", TimeSelection.entries[selection.selectedItemPosition].name)
+            .putString("time_selection", timeSelection.name)
             .putString("time_zone", zone.id)
             .putString("source_fields", sources.joinToString(",") { it.name })
             .putString("destination_fields", destinations.joinToString(",") { it.name })
