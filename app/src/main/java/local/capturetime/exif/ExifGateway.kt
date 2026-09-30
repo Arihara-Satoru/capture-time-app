@@ -8,16 +8,17 @@ import local.capturetime.settings.TimeField
 import java.io.File
 import java.io.FileDescriptor
 import java.time.Instant
+import java.time.ZoneId
 
 data class ExifTimes(
     val original: String?, val digitized: String?, val modified: String?,
     val originalOffset: String? = null, val digitizedOffset: String? = null, val modifiedOffset: String? = null
 )
 
-class ExifGateway {
+class ExifGateway(private val zone: ZoneId = CaptureTimeParser.zone) {
     fun readOriginal(file: File): Instant? = try {
         val raw = readRaw(file)
-        CaptureTimeParser.parseExif(raw.original, raw.originalOffset)
+        CaptureTimeParser.parseExif(raw.original, raw.originalOffset, zone)
     } catch (_: Exception) {
         null
     }
@@ -62,8 +63,8 @@ class ExifGateway {
     }
 
     private fun writeAttributes(exif: ExifInterface, target: Instant, fields: Set<TimeField>) {
-        val value = CaptureTimeParser.formatExif(target)
-        val offset = CaptureTimeParser.formatExifOffset(target)
+        val value = CaptureTimeParser.formatExif(target, zone)
+        val offset = CaptureTimeParser.formatExifOffset(target, zone)
         exif.apply {
             if (TimeField.EXIF_ORIGINAL in fields) {
                 setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, value)
@@ -98,8 +99,8 @@ class ExifGateway {
     }
 
     private fun verifyTimes(actual: ExifTimes, target: Instant, fields: Set<TimeField>): Boolean {
-        val expected = CaptureTimeParser.formatExif(target)
-        val offset = CaptureTimeParser.formatExifOffset(target)
+        val expected = CaptureTimeParser.formatExif(target, zone)
+        val offset = CaptureTimeParser.formatExifOffset(target, zone)
         return (TimeField.EXIF_ORIGINAL !in fields || (actual.original == expected && actual.originalOffset == offset)) &&
             (TimeField.EXIF_DIGITIZED !in fields || (actual.digitized == expected && actual.digitizedOffset == offset)) &&
             (TimeField.EXIF_MODIFIED !in fields || (actual.modified == expected && actual.modifiedOffset == offset))
@@ -108,9 +109,9 @@ class ExifGateway {
     fun needsSync(actual: ExifTimes?, target: Instant): Boolean {
         if (actual == null) return false
         val expected = Instant.ofEpochSecond(target.epochSecond)
-        return CaptureTimeParser.parseExif(actual.original, actual.originalOffset) != expected ||
-            CaptureTimeParser.parseExif(actual.digitized, actual.digitizedOffset) != expected ||
-            CaptureTimeParser.parseExif(actual.modified, actual.modifiedOffset) != expected
+        return CaptureTimeParser.parseExif(actual.original, actual.originalOffset, zone) != expected ||
+            CaptureTimeParser.parseExif(actual.digitized, actual.digitizedOffset, zone) != expected ||
+            CaptureTimeParser.parseExif(actual.modified, actual.modifiedOffset, zone) != expected
     }
 
     private fun rewind(descriptor: FileDescriptor) {

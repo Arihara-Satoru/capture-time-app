@@ -64,7 +64,7 @@ class PhotoScanner(
             else "扩展名与文件签名不匹配或格式不支持", extensionCorrection = inspection.correction)
 
         val rawExif = runCatching { exif.readRaw(file) }.getOrNull()
-        val exifTime = CaptureTimeParser.parseExif(rawExif?.original, rawExif?.originalOffset)
+        val exifTime = CaptureTimeParser.parseExif(rawExif?.original, rawExif?.originalOffset, rule.zone)
         val media = indexedMedia
         if (media?.rawDateAddedSeconds == null) {
             return skipped(file, format, "缺少可核验的 MediaStore DATE_ADDED，无法证明添加时间不变", exifTime, media)
@@ -76,10 +76,10 @@ class PhotoScanner(
             else -> null
         }
         val stem = file.name.substringBeforeLast('.', file.name)
-        if (TimeField.FILENAME in rule.sourceFields && CaptureTimeParser.hasAmbiguousFilenameTime(stem)) {
+        if (TimeField.FILENAME in rule.sourceFields && CaptureTimeParser.hasAmbiguousFilenameTime(stem, rule.zone)) {
             return skipped(file, format, "文件名包含多个不同的有效时间", exifTime, media)
         }
-        val filenameTime = CaptureTimeParser.parseFilename(stem)
+        val filenameTime = CaptureTimeParser.parseFilename(stem, rule.zone)
         val values = rule.values(rawExif, media, filenameTime, Instant.ofEpochMilli(file.lastModified()))
         val target = rule.selectTarget(values)
             ?: return skipped(file, format, "所选依据字段均缺少有效时间", exifTime, media, filenameTime)

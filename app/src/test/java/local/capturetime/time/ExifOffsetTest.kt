@@ -8,6 +8,7 @@ import local.capturetime.settings.TimeRuleConfig
 import org.junit.Assert.*
 import org.junit.Test
 import java.time.Instant
+import java.time.ZoneId
 
 class ExifOffsetTest {
     @Test fun deviceSampleMatchesScannerWithSubseconds() {
@@ -48,5 +49,16 @@ class ExifOffsetTest {
         val values = rule.values(raw, null, null, Instant.EPOCH)
         assertEquals(target, rule.selectTarget(values))
         assertFalse(rule.needsChange(values[TimeField.EXIF_ORIGINAL], target))
+    }
+
+    @Test fun configuredZoneInterpretsMissingOffsetAndWritesExplicitOffset() {
+        val zone = ZoneId.of("Asia/Tokyo")
+        val local = "2023:02:10 12:05:21"
+        val target = Instant.parse("2023-02-10T03:05:21Z")
+        assertEquals(target, CaptureTimeParser.parseExif(local, timeZone = zone))
+        assertEquals(local, CaptureTimeParser.formatExif(target, zone))
+        assertEquals("+09:00", CaptureTimeParser.formatExifOffset(target, zone))
+        assertEquals(target, CaptureTimeParser.parseExif(local, "+09:00", CaptureTimeParser.zone))
+        assertEquals(target.toEpochMilli(), MediaScanExpectation.dateTaken(local, null, "+09:00", zone))
     }
 }

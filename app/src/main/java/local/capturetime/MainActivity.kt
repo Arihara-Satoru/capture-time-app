@@ -105,12 +105,12 @@ class MainActivity : Activity() {
         mediaStore = MediaStoreGateway(applicationContext)
         duplicateScanner = DuplicateScanner(mediaStore)
         duplicateProcessor = DuplicateDeleteProcessor(applicationContext, mediaStore)
-        exif = ExifGateway()
         reloadTimeRule()
         snapshotStore = ScanSnapshotStore(this)
         adapter = PhotoAdapter(
             onSelected = { record -> selected = record; updateActions() },
             onPreview = { record -> showPhotoPreview(record.file) },
+            zone = timeRule.zone,
         )
         duplicateAdapter = DuplicateAdapter(::updateDuplicateActions, ::showDuplicateComparison)
         findViewById<RecyclerView>(R.id.photoList).apply {
@@ -432,7 +432,7 @@ class MainActivity : Activity() {
     private fun confirmTrial() {
         val record = selected ?: return
         MaterialAlertDialogBuilder(this).setTitle("确认单张试运行")
-            .setMessage("将创建全新会话并备份：\n${record.file.absolutePath}\n\n规则目标时间：${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}\n${record.reason}\n失败将立即恢复。是否继续？")
+            .setMessage("将创建全新会话并备份：\n${record.file.absolutePath}\n\n规则目标时间：${CaptureTimeParser.formatDisplay(record.targetCaptureTime, timeRule.zone)}\n${record.reason}\n失败将立即恢复。是否继续？")
             .setNegativeButton("取消", null).setPositiveButton("确认写入") { _, _ -> runSession(listOf(record), true) }.show()
     }
 
@@ -460,7 +460,7 @@ class MainActivity : Activity() {
                 try {
                     session = BackupOperationGuard.beginCapture(
                         applicationContext,
-                        { SessionLogger.create(Environment.getExternalStorageDirectory(), records) },
+                        { SessionLogger.create(Environment.getExternalStorageDirectory(), records, timeRule.zone) },
                         SessionLogger::directory
                     )
                     val paths = selectedRecords.mapTo(hashSetOf()) { it.file.absolutePath }
@@ -972,8 +972,10 @@ class MainActivity : Activity() {
 
     private fun reloadTimeRule(rule: TimeRuleConfig = TimeRuleConfig.load(this)) {
         timeRule = rule
+        exif = ExifGateway(rule.zone)
         scanner = PhotoScanner(mediaStore, exif, timeRule)
         processor = SafePhotoProcessor(this, exif, mediaStore, timeRule)
+        if (::adapter.isInitialized) adapter.zone = rule.zone
     }
 
     companion object {

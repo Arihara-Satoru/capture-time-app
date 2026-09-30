@@ -5,6 +5,7 @@ import local.capturetime.exif.ExifTimes
 import local.capturetime.model.MediaSnapshot
 import local.capturetime.time.CaptureTimeParser
 import java.time.Instant
+import java.time.ZoneId
 import kotlin.math.abs
 
 enum class TimeSelection(val label: String) {
@@ -27,7 +28,8 @@ data class TimeRuleConfig(
     val selection: TimeSelection = TimeSelection.EARLIEST,
     val sourceFields: Set<TimeField> = DEFAULT_SOURCES,
     val destinationFields: Set<TimeField> = DEFAULT_DESTINATIONS,
-    val toleranceSeconds: Long = 0
+    val toleranceSeconds: Long = 0,
+    val zone: ZoneId = CaptureTimeParser.zone
 ) {
     fun selectTarget(values: Map<TimeField, Instant?>): Instant? {
         val available = sourceFields.mapNotNull(values::get)
@@ -49,7 +51,9 @@ data class TimeRuleConfig(
         return destinationFields.filter { field ->
             val actual = values[field]
             when {
-                actual != null -> needsChange(actual, target)
+                actual != null -> needsChange(actual, target) ||
+                    (field == TimeField.EXIF_ORIGINAL && exif?.originalOffset.isNullOrBlank() &&
+                        values[TimeField.MEDIA_DATE_TAKEN]?.epochSecond?.let { it != target.epochSecond } == true)
                 !field.isMissingIn(exif) -> true
                 toleranceSeconds == 0L -> true
                 currentCapture == null -> true
@@ -71,12 +75,12 @@ data class TimeRuleConfig(
         filenameTime: Instant?,
         fileModified: Instant
     ): Map<TimeField, Instant?> {
-        val original = CaptureTimeParser.parseExif(exif?.original, exif?.originalOffset)
+        val original = CaptureTimeParser.parseExif(exif?.original, exif?.originalOffset, zone)
         return mapOf(
             TimeField.CURRENT_CAPTURE to (original ?: media?.dateTaken),
             TimeField.EXIF_ORIGINAL to original,
-            TimeField.EXIF_DIGITIZED to CaptureTimeParser.parseExif(exif?.digitized, exif?.digitizedOffset),
-            TimeField.EXIF_MODIFIED to CaptureTimeParser.parseExif(exif?.modified, exif?.modifiedOffset),
+            TimeField.EXIF_DIGITIZED to CaptureTimeParser.parseExif(exif?.digitized, exif?.digitizedOffset, zone),
+            TimeField.EXIF_MODIFIED to CaptureTimeParser.parseExif(exif?.modified, exif?.modifiedOffset, zone),
             TimeField.MEDIA_DATE_TAKEN to media?.dateTaken,
             TimeField.MEDIA_DATE_ADDED to media?.dateAdded,
             TimeField.FILENAME to filenameTime,
@@ -102,7 +106,9 @@ data class TimeRuleConfig(
             val destinations = parseFields(prefs.getString("destination_fields", null), DEFAULT_DESTINATIONS).filterTo(mutableSetOf()) { it.canWrite }
             val tolerance = prefs.getInt("days", 0) * 86_400L + prefs.getInt("hours", 0) * 3_600L +
                 prefs.getInt("minutes", 0) * 60L + prefs.getInt("seconds", 0)
-            return TimeRuleConfig(selection, sources.ifEmpty { DEFAULT_SOURCES }, destinations.ifEmpty { DEFAULT_DESTINATIONS }, tolerance)
+            val zone = runCatching { prefs.getString("time_zone", null)?.let(ZoneId::of) ?: CaptureTimeParser.zone }
+                .getOrDefault(CaptureTimeParser.zone)
+            return TimeRuleConfig(selection, sources.ifEmpty { DEFAULT_SOURCES }, destinations.ifEmpty { DEFAULT_DESTINATIONS }, tolerance, zone)
         }
 
         private fun parseFields(value: String?, fallback: Set<TimeField>): Set<TimeField> {

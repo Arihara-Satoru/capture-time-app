@@ -127,6 +127,24 @@ class TimeRuleConfigTest {
         assertEquals(listOf(TimeField.EXIF_ORIGINAL), rule.fieldsNeedingChange(values, early, null))
     }
 
+    @Test fun missingOriginalOffsetIsRepairedWhenMediaScannerDisagrees() {
+        val rule = TimeRuleConfig(toleranceSeconds = 3600)
+        val samples = listOf(
+            Triple("2019:03:16 19:25:42", 1552717542979L, 1552735542000L),
+            Triple("2023:02:10 12:05:21", 1676030721907L, 1676001921000L)
+        )
+        samples.forEach { (date, mediaMillis, targetMillis) ->
+            val raw = ExifTimes(date, date, date)
+            val target = Instant.ofEpochMilli(targetMillis)
+            val media = MediaSnapshot(1, Instant.ofEpochMilli(mediaMillis), target, target.epochSecond)
+            val values = rule.values(raw, media, null, target)
+            assertEquals(target, rule.selectTarget(values))
+            assertTrue(TimeField.EXIF_ORIGINAL in rule.fieldsNeedingChange(values, target, raw))
+            assertFalse(TimeField.EXIF_ORIGINAL in rule.fieldsNeedingChange(
+                values, target, raw.copy(originalOffset = "+08:00")))
+        }
+    }
+
     @Test fun missingExifChangesWhenCurrentCaptureIsOutsideTolerance() {
         val rule = TimeRuleConfig(
             destinationFields = setOf(TimeField.EXIF_ORIGINAL),

@@ -10,11 +10,13 @@ import local.capturetime.model.PhotoRecord
 import local.capturetime.time.CaptureTimeParser
 import android.media.ThumbnailUtils
 import android.util.Size
+import java.time.ZoneId
 import java.util.concurrent.Executors
 
 class PhotoAdapter(
     private val onSelected: (PhotoRecord) -> Unit,
     private val onPreview: (PhotoRecord) -> Unit,
+    var zone: ZoneId = CaptureTimeParser.zone,
 ) : RecyclerView.Adapter<PhotoAdapter.Holder>() {
     private var items: List<PhotoRecord> = emptyList()
     private var selectedPath: String? = null
@@ -55,11 +57,11 @@ class PhotoAdapter(
             format.text = if (record.extensionCorrection != null) " 后缀不符 · 建议 .${record.extensionCorrection} "
                 else " ${record.format.label} · ${if (record.safeForTrial) "可安全试运行" else "需人工确认"} "
             target.text = if (record.extensionCorrection != null) record.reason
-                else "目标时间 · ${CaptureTimeParser.formatDisplay(record.targetCaptureTime)}"
+                else "目标时间 · ${CaptureTimeParser.formatDisplay(record.targetCaptureTime, zone)}"
             details.text = if (record.extensionCorrection != null) "改名后重新扫描，才会比较图片时间"
-                else "当前时间 ${CaptureTimeParser.formatDisplay(record.currentCaptureTime)}\n" +
-                    "添加时间 ${CaptureTimeParser.formatDisplay(record.media?.dateAdded)}\n" +
-                    "文件名时间 ${CaptureTimeParser.formatDisplay(record.filenameTime)}"
+                else "当前时间 ${CaptureTimeParser.formatDisplay(record.currentCaptureTime, zone)}\n" +
+                    "添加时间 ${CaptureTimeParser.formatDisplay(record.media?.dateAdded, zone)}\n" +
+                    "文件名时间 ${CaptureTimeParser.formatDisplay(record.filenameTime, zone)}"
             path.text = record.file.parent ?: record.file.absolutePath
             itemView.contentDescription = "${record.file.name}，${record.reason}。${if (itemView.isSelected) "已选择" else "点击选择"}"
             itemView.setOnClickListener {

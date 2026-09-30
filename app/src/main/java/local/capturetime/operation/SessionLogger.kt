@@ -10,10 +10,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.time.ZonedDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicInteger
 
-class SessionLogger private constructor(val directory: File, records: List<PhotoRecord>) {
+class SessionLogger private constructor(val directory: File, records: List<PhotoRecord>, private val zone: ZoneId) {
     private val changed = File(directory, "changed.tsv")
     private val skipped = File(directory, "skipped.tsv")
     private val restored = File(directory, "restored.tsv")
@@ -60,13 +61,13 @@ class SessionLogger private constructor(val directory: File, records: List<Photo
         val record = result.record
         if (result.success) {
             append(changed, listOf(
-                record.file.absolutePath, result.backupPath.orEmpty(), CaptureTimeParser.formatDisplay(record.currentCaptureTime),
-                CaptureTimeParser.formatDisplay(record.targetCaptureTime), result.exifVerification, result.mediaStoreVerification
+                record.file.absolutePath, result.backupPath.orEmpty(), CaptureTimeParser.formatDisplay(record.currentCaptureTime, zone),
+                CaptureTimeParser.formatDisplay(record.targetCaptureTime, zone), result.exifVerification, result.mediaStoreVerification
             ).joinToString("\t", transform = ::cell))
             successCount.incrementAndGet()
         } else if (result.restored) {
             append(restored, listOf(
-                record.file.absolutePath, result.backupPath.orEmpty(), CaptureTimeParser.formatDisplay(record.targetCaptureTime),
+                record.file.absolutePath, result.backupPath.orEmpty(), CaptureTimeParser.formatDisplay(record.targetCaptureTime, zone),
                 result.reason, result.exifVerification, result.mediaStoreVerification, result.restoreVerification
             ).joinToString("\t", transform = ::cell))
             restoredCount.incrementAndGet()
@@ -92,9 +93,9 @@ class SessionLogger private constructor(val directory: File, records: List<Photo
     }
 
     private fun plannedRow(record: PhotoRecord) = listOf(
-        record.file.absolutePath, record.format.label, CaptureTimeParser.formatDisplay(record.currentCaptureTime),
-        record.captureSource?.label.orEmpty(), CaptureTimeParser.formatDisplay(record.media?.dateAdded),
-        CaptureTimeParser.formatDisplay(record.filenameTime), CaptureTimeParser.formatDisplay(record.targetCaptureTime),
+        record.file.absolutePath, record.format.label, CaptureTimeParser.formatDisplay(record.currentCaptureTime, zone),
+        record.captureSource?.label.orEmpty(), CaptureTimeParser.formatDisplay(record.media?.dateAdded, zone),
+        CaptureTimeParser.formatDisplay(record.filenameTime, zone), CaptureTimeParser.formatDisplay(record.targetCaptureTime, zone),
         record.candidate.toString(), record.safeForTrial.toString(), record.reason
     ).joinToString("\t", transform = ::cell)
 
@@ -119,14 +120,14 @@ class SessionLogger private constructor(val directory: File, records: List<Photo
     companion object {
         private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
 
-        fun create(storageRoot: File, records: List<PhotoRecord>): SessionLogger {
+        fun create(storageRoot: File, records: List<PhotoRecord>, zone: ZoneId = CaptureTimeParser.zone): SessionLogger {
             repeat(3) {
                 val name = BackupSessionRules.captureSessionName(
                     formatter.format(ZonedDateTime.now(CaptureTimeParser.zone)),
                     BuildConfig.DEBUG
                 )
                 val directory = runCatching { BackupSessionRules.createSessionDirectory(storageRoot, name) }.getOrNull()
-                if (directory != null) return SessionLogger(directory, records)
+                if (directory != null) return SessionLogger(directory, records, zone)
                 Thread.sleep(1100)
             }
             error("无法创建唯一会话目录")

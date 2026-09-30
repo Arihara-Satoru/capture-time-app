@@ -28,8 +28,8 @@ object CaptureTimeParser {
 
     private data class FilenameTimeMatch(val range: IntRange, val time: Instant)
 
-    fun parseExif(value: String?, offset: String? = null): Instant? {
-        if (offset.isNullOrBlank()) return parseLocal(value, exifFormatter)
+    @JvmOverloads fun parseExif(value: String?, offset: String? = null, timeZone: ZoneId = zone): Instant? {
+        if (offset.isNullOrBlank()) return parseLocal(value, exifFormatter, timeZone)
         if (value.isNullOrBlank() || !Regex("[+-]\\d{2}:\\d{2}").matches(offset.trim())) return null
         return try {
             LocalDateTime.parse(value.trim(), exifFormatter)
@@ -39,20 +39,20 @@ object CaptureTimeParser {
         }
     }
 
-    fun formatExifOffset(value: Instant): String = value.atZone(zone).offset.id
+    @JvmOverloads fun formatExifOffset(value: Instant, timeZone: ZoneId = zone): String = value.atZone(timeZone).offset.id
 
-    fun parseFilename(filenameWithoutExtension: String): Instant? {
-        return parsedFilenameTimes(filenameWithoutExtension).singleOrNull()
+    @JvmOverloads fun parseFilename(filenameWithoutExtension: String, timeZone: ZoneId = zone): Instant? {
+        return parsedFilenameTimes(filenameWithoutExtension, timeZone).singleOrNull()
     }
 
-    fun hasAmbiguousFilenameTime(filenameWithoutExtension: String): Boolean {
-        return parsedFilenameTimes(filenameWithoutExtension).size > 1
+    @JvmOverloads fun hasAmbiguousFilenameTime(filenameWithoutExtension: String, timeZone: ZoneId = zone): Boolean {
+        return parsedFilenameTimes(filenameWithoutExtension, timeZone).size > 1
     }
 
-    private fun parsedFilenameTimes(filenameWithoutExtension: String): List<Instant> {
+    private fun parsedFilenameTimes(filenameWithoutExtension: String, timeZone: ZoneId): List<Instant> {
         val formatted = filenamePatterns.flatMap { (regex, formatter) ->
             regex.findAll(filenameWithoutExtension).mapNotNull { match ->
-                parseLocal(match.groupValues[1], formatter)?.let { time ->
+                parseLocal(match.groupValues[1], formatter, timeZone)?.let { time ->
                     FilenameTimeMatch(match.range, time)
                 }
             }
@@ -72,14 +72,15 @@ object CaptureTimeParser {
         return (formatted.map { it.time } + epochMillis).distinct().toList()
     }
 
-    fun formatExif(value: Instant): String = outputFormatter.format(value)
-    fun formatDisplay(value: Instant?): String = value?.let(displayFormatter::format) ?: "-"
+    @JvmOverloads fun formatExif(value: Instant, timeZone: ZoneId = zone): String = outputFormatter.withZone(timeZone).format(value)
+    @JvmOverloads fun formatDisplay(value: Instant?, timeZone: ZoneId = zone): String =
+        value?.let { displayFormatter.withZone(timeZone).format(it) } ?: "-"
 
-    private fun parseLocal(value: String?, formatter: DateTimeFormatter): Instant? {
+    private fun parseLocal(value: String?, formatter: DateTimeFormatter, timeZone: ZoneId): Instant? {
         if (value.isNullOrBlank()) return null
         return try {
             LocalDateTime.parse(value.trim(), formatter.withResolverStyle(ResolverStyle.STRICT))
-                .atZone(zone).toInstant()
+                .atZone(timeZone).toInstant()
         } catch (_: DateTimeException) {
             null
         }

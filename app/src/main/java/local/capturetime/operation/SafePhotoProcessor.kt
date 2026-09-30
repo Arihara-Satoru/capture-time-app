@@ -62,10 +62,10 @@ class SafePhotoProcessor(
         if (originalMedia.rawDateAddedSeconds == null) return failure(record, "写入前 DATE_ADDED 已不可核验")
         val originalModifiedMillis = record.file.lastModified()
         val stem = record.file.name.substringBeforeLast('.', record.file.name)
-        if (TimeField.FILENAME in rule.sourceFields && CaptureTimeParser.hasAmbiguousFilenameTime(stem)) {
+        if (TimeField.FILENAME in rule.sourceFields && CaptureTimeParser.hasAmbiguousFilenameTime(stem, rule.zone)) {
             return failure(record, "写入前文件名时间存在歧义")
         }
-        val values = rule.values(originalExif, originalMedia, CaptureTimeParser.parseFilename(stem), java.time.Instant.ofEpochMilli(originalModifiedMillis))
+        val values = rule.values(originalExif, originalMedia, CaptureTimeParser.parseFilename(stem, rule.zone), java.time.Instant.ofEpochMilli(originalModifiedMillis))
         val recalculatedTarget = rule.selectTarget(values)
         val changedFields = rule.fieldsNeedingChange(values, target, originalExif).toSet()
         if (recalculatedTarget != target || changedFields.isEmpty()) {
@@ -100,8 +100,8 @@ class SafePhotoProcessor(
                 if (exifFields.isNotEmpty()) exif.write(descriptor, target, exifFields)
                 exifVerification = if (exifFields.isEmpty() || exif.verify(descriptor, target, exifFields)) "通过" else "失败"
                 require(exifVerification == "通过") {
-                    "所选 EXIF 字段核验失败；目标=${CaptureTimeParser.formatExif(target)} " +
-                        "offset=${CaptureTimeParser.formatExifOffset(target)}；字段=$exifFields；" +
+                    "所选 EXIF 字段核验失败；目标=${CaptureTimeParser.formatExif(target, rule.zone)} " +
+                        "offset=${CaptureTimeParser.formatExifOffset(target, rule.zone)}；字段=$exifFields；" +
                         "实际=${exif.readRaw(descriptor)}"
                 }
                 require(descriptorFile.setLastModified(expectedModified)) { "无法设置文件修改时间" }
@@ -111,14 +111,14 @@ class SafePhotoProcessor(
                 exif.readRaw(descriptor)
             }
             val expectedMillis = MediaScanExpectation.dateTaken(
-                actualExif.original, originalMedia.dateTaken?.toEpochMilli(), actualExif.originalOffset
+                actualExif.original, originalMedia.dateTaken?.toEpochMilli(), actualExif.originalOffset, rule.zone
             )
             onStage("系统媒体扫描")
             val scannedUri = scan(record.file)
             require(scannedUri != null) { "媒体扫描超时或失败" }
             onStage("MediaStore 时间核验")
             val verified = waitForMedia(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds,
-                secondPrecision = CaptureTimeParser.parseExif(actualExif.original, actualExif.originalOffset) != null)
+                secondPrecision = CaptureTimeParser.parseExif(actualExif.original, actualExif.originalOffset, rule.zone) != null)
             mediaVerification = if (verified) "通过（扫描回调 URI）" else mediaDiagnostic(record.file, scannedUri, expectedMillis, originalMedia.rawDateAddedSeconds)
             require(verified) { "MediaStore DATE_TAKEN 或 DATE_ADDED 核验失败" }
             require(VerifiedPhotoBackup.hasIdentity(record.file, storage, backupReceipt.sourceIdentity)) {

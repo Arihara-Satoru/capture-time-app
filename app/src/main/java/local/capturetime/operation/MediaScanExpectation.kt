@@ -1,6 +1,7 @@
 package local.capturetime.operation
 
 import local.capturetime.time.CaptureTimeParser
+import java.time.ZoneId
 
 internal object MediaScanExpectation {
     fun matchesTaken(actualMillis: Long?, expectedMillis: Long?, secondPrecision: Boolean): Boolean =
@@ -9,6 +10,7 @@ internal object MediaScanExpectation {
         } else actualMillis == expectedMillis)
 
     // A rescan can replace a stale database value even when DateTimeOriginal was not edited.
-    fun dateTaken(actualExifOriginal: String?, previousTakenMillis: Long?, originalOffset: String? = null): Long? =
-        CaptureTimeParser.parseExif(actualExifOriginal, originalOffset)?.toEpochMilli() ?: previousTakenMillis
+    fun dateTaken(actualExifOriginal: String?, previousTakenMillis: Long?, originalOffset: String? = null,
+                  zone: ZoneId = CaptureTimeParser.zone): Long? =
+        CaptureTimeParser.parseExif(actualExifOriginal, originalOffset, zone)?.toEpochMilli() ?: previousTakenMillis
 }
