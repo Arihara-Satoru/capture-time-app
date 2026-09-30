@@ -180,6 +180,21 @@ class TimeRuleConfigTest {
         }
     }
 
+    @Test fun missingOffsetRespectsToleranceAndComparesMediaWithExifInsteadOfFilenameTarget() {
+        val rule = TimeRuleConfig(toleranceSeconds = 3600)
+        val raw = ExifTimes("2018:06:14 18:18:29", "2018:06:14 18:18:29", "2018:06:14 18:18:29")
+        val original = Instant.ofEpochMilli(1528971509000L)
+        val filename = Instant.ofEpochMilli(1528971508000L)
+        val values = rule.values(raw, MediaSnapshot(1, original.plusMillis(300), late, late.epochSecond), filename, original)
+        assertEquals(filename, rule.selectTarget(values))
+        assertTrue(rule.fieldsNeedingChange(values, filename, raw).isEmpty())
+        assertTrue(rule.copy(toleranceSeconds = 0).fieldsNeedingChange(values, original, raw).isEmpty())
+        assertFalse(TimeField.EXIF_ORIGINAL in rule.fieldsNeedingChange(
+            values + (TimeField.MEDIA_DATE_TAKEN to original.plusSeconds(3600)), filename, raw))
+        assertTrue(TimeField.EXIF_ORIGINAL in rule.fieldsNeedingChange(
+            values + (TimeField.MEDIA_DATE_TAKEN to original.plusSeconds(3601)), filename, raw))
+    }
+
     @Test fun missingExifChangesWhenCurrentCaptureIsOutsideTolerance() {
         val rule = TimeRuleConfig(
             destinationFields = setOf(TimeField.EXIF_ORIGINAL),

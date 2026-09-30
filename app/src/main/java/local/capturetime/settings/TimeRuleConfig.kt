@@ -64,7 +64,7 @@ data class TimeRuleConfig(
             when {
                 actual != null -> needsChange(actual, target) ||
                     (field == TimeField.EXIF_ORIGINAL && exif?.originalOffset.isNullOrBlank() &&
-                        values[TimeField.MEDIA_DATE_TAKEN]?.epochSecond?.let { it != target.epochSecond } == true)
+                        values[TimeField.MEDIA_DATE_TAKEN]?.let { needsChange(it, actual) } == true)
                 !field.isMissingIn(exif) -> true
                 toleranceSeconds == 0L -> true
                 currentCapture == null -> true
