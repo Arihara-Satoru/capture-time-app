@@ -24,6 +24,13 @@ class FileVerificationTest {
             assertEquals(FileVerification.jpegWithoutExifHash(first), FileVerification.jpegWithoutExifHash(second))
             second.writeBytes(jpeg(2, 4))
             assertFalse(FileVerification.sameJpegExceptExif(first, second))
+            val video = byteArrayOf(0, 0, 0, 12, 102, 116, 121, 112, 109, 112, 52, 50)
+            first.writeBytes(jpeg(1, 3) + video)
+            second.writeBytes(jpeg(2, 3, byteArrayOf(4, 5)) + video)
+            assertTrue(FileVerification.sameJpegExceptExif(first, second))
+            assertEquals(FileVerification.jpegWithoutExifSize(first), FileVerification.jpegWithoutExifSize(second))
+            second.appendBytes(byteArrayOf(1))
+            assertFalse(FileVerification.sameJpegExceptExif(first, second))
         } finally {
             first.delete()
             second.delete()

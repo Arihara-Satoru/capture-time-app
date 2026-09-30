@@ -41,9 +41,7 @@ object FileVerification {
 
     private fun exifSegments(input: RandomAccessFile): List<Pair<Long, Long>>? {
         if (input.length() < 4 || input.read() != 0xff || input.read() != 0xd8) return null
-        input.seek(input.length() - 2)
-        if (input.read() != 0xff || input.read() != 0xd9) return null
-        input.seek(2)
+        // Motion photos append video after JPEG EOI; keep that trailer in the size and hash.
         val segments = mutableListOf<Pair<Long, Long>>()
         while (input.filePointer < input.length()) {
             val start = input.filePointer
